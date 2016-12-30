@@ -1,1 +1,14 @@
 
+###Things To Do
+ 
+  ##Xsection Script
+    -generate automatic layer properties file 
+    -Xsection, calculate with more than one ruler
+    -toolbox button with the last use file
+    
+    
+  ##LayerView    
+    -check layout view for file, if there is no file generate one, name?
+    -generate a XS File with the in and output information from the view
+    
+
