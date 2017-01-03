@@ -8,7 +8,7 @@
     
     
   ##LayerView    
-    -check layout view for file, if there is no file generate one, name?
-    -generate a XS File with the in and output information from the view
+    -check layout view for file, if there is no file generate one, name? filename.xs.lyp
+    -generate a XS File with the in and output information from the view -> in- output generation automatically
     
 
