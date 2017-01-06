@@ -69,7 +69,7 @@ def string_to_layerinfo(layer_spec)
 
 end
 
-class LayoutData
+class LayoutData2
 
   def initialize(polygons, xs)
     @polygons = polygons
@@ -118,54 +118,62 @@ class LayoutData
 
   def sized(*args)
     if args.length == 1
-      LayoutData.new(@ep.size_to_polygon(@polygons, (args[0] / @xs.dbu + 0.5).floor.to_i, 2, true, true), @xs)
+      LayoutData2.new(@ep.size_to_polygon(@polygons, (args[0] / @xs.dbu + 0.5).floor.to_i, 2, true, true), @xs)
     elsif args.length == 2
-      LayoutData.new(@ep.size_to_polygon(@polygons, (args[0] / @xs.dbu + 0.5).floor.to_i, (args[1] / @xs.dbu + 0.5).floor.to_i, 2, true, true), @xs)
+      LayoutData2.new(@ep.size_to_polygon(@polygons, (args[0] / @xs.dbu + 0.5).floor.to_i, (args[1] / @xs.dbu + 0.5).floor.to_i, 2, true, true), @xs)
     end
   end
 
   def inverted
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, [RBA::Polygon.new(@xs.background)], RBA::EdgeProcessor::mode_xor, true, true), @xs)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, [RBA::Polygon.new(@xs.background)], RBA::EdgeProcessor::mode_xor, true, true), @xs)
   end
 
-  def or(other)
-    raise "'or': argument is not a layer" unless other.kind_of?(LayoutData)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_or, true, true), @xs)
+  def or(others)
+	if others.is_a?(Array)	
+		others.each do |other|
+			others[0] = others[0].or(other)
+		end
+		self.or(others[0])
+	else
+		raise "'or': argument is not a layer"+ others.to_s unless others.kind_of?(LayoutData2)
+		LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, others.data, RBA::EdgeProcessor::mode_or, true, true), @xs)
+		#Boolean operation mode_or @polygons => object data, others => second polygon set
+	end
   end
 
   def orp(other)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_or, true, true), @xs)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_or, true, true), @xs)
   end
 
   def and(other)
-    raise "'and': argument is not a layer" unless other.kind_of?(LayoutData)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_and, true, true), @xs)
+    raise "'and': argument is not a layer" unless other.kind_of?(LayoutData2)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_and, true, true), @xs)
   end
 
   def andp(other)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_and, true, true), @xs)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_and, true, true), @xs)
   end
 
   def xor(other)
-    raise "'xor': argument is not a layer" unless other.kind_of?(LayoutData)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_xor, true, true), @xs)
+    raise "'xor': argument is not a layer" unless other.kind_of?(LayoutData2)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_xor, true, true), @xs)
   end
 
   def xorp(other)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_xor, true, true), @xs)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_xor, true, true), @xs)
   end
 
   def not(other)
-    raise "'not': argument is not a layer" unless other.kind_of?(LayoutData)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_anotb, true, true), @xs)
+    raise "'not': argument is not a layer" unless other.kind_of?(LayoutData2)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_anotb, true, true), @xs)
   end
 
   def notp(other)
-    LayoutData.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_anotb, true, true), @xs)
+    LayoutData2.new(@ep.safe_boolean_to_polygon(@polygons, other, RBA::EdgeProcessor::mode_anotb, true, true), @xs)
   end
 
   def add(other)
-    raise "'add': argument is not a layer" unless other.kind_of?(LayoutData)
+    raise "'add': argument is not a layer" unless other.kind_of?(LayoutData2)
     @polygons = @ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_or, true, true)
   end
 
@@ -174,7 +182,7 @@ class LayoutData
   end
 
   def sub(other)
-    raise "'sub': argument is not a layer" unless other.kind_of?(LayoutData)
+    raise "'sub': argument is not a layer" unless other.kind_of?(LayoutData2)
     @polygons = @ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_anotb, true, true)
   end
 
@@ -183,7 +191,7 @@ class LayoutData
   end
 
   def mask(other)
-    raise "'mask': argument is not a layer" unless other.kind_of?(LayoutData)
+    raise "'mask': argument is not a layer" unless other.kind_of?(LayoutData2)
     @polygons = @ep.safe_boolean_to_polygon(@polygons, other.data, RBA::EdgeProcessor::mode_and, true, true)
   end
 
@@ -217,7 +225,7 @@ class LayoutData
 
 end
 
-class MaterialData < LayoutData
+class MaterialData2 < LayoutData2
 
   # 'delta' is the intrinsic height (required for mask data because there cannot be
   # an infinitly small mask layer (in database units)
@@ -225,6 +233,7 @@ class MaterialData < LayoutData
     super(polygons, xs)
     @delta = delta
   end
+
 
   def grow(*args)
 
@@ -235,7 +244,7 @@ class MaterialData < LayoutData
     d = produce_geom(xy, z, into, through, on, taper, bias, mode, buried, :grow)
 
     # prepare the result
-    res = MaterialData.new(d, @xs, 0)
+    res = MaterialData2.new(d, @xs, 0)
 
     # consume material
     if into
@@ -265,7 +274,7 @@ class MaterialData < LayoutData
     d = produce_geom(xy, z, into, through, on, taper, bias, mode, buried, :etch)
 
     # produce the geometry of the etched material
-    res = MaterialData.new(d, @xs, 0)
+    res = MaterialData2.new(d, @xs, 0)
 
     # consume material and add to air
     if into
@@ -302,7 +311,7 @@ class MaterialData < LayoutData
               into = v
             end
             into.each do |i|
-              if !i.kind_of?(LayoutData) # should be MaterialData @@@
+              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
                 raise "'#{method}' method: 'into' expects a material parameter or an array of such"
               end
             end
@@ -313,7 +322,7 @@ class MaterialData < LayoutData
               on = v
             end
             on.each do |i|
-              if !i.kind_of?(LayoutData) # should be MaterialData @@@
+              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
                 raise "'#{method}' method: 'on' expects a material parameter or an array of such"
               end
             end
@@ -324,7 +333,7 @@ class MaterialData < LayoutData
               through = v
             end
             through.each do |i|
-              if !i.kind_of?(LayoutData) # should be MaterialData @@@
+              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
                 raise "'#{method}' method: 'through' expects a material parameter or an array of such"
               end
             end
@@ -509,6 +518,14 @@ class MaterialData < LayoutData
 
   end
 
+  ###tvl2 functions
+
+	def spacer_arg(*args)
+		# parse the arguments
+		(xy, z, into, through, on, taper, bias, mode, buried) = parse_grow_etch_args(args, :grow)
+	end
+  
+###lvl2 functions end 
 end
 
 # The main class that creates a cross-section file
@@ -526,14 +543,14 @@ class XSectionGenerator2
   end
 
   def layer(layer_spec)
-    ld = LayoutData.new([], self)
+    ld = LayoutData2.new([], self)
     ld.load(@layout, @cell, @line_dbu.bbox.enlarge(RBA::Point.new(@extend, @extend)), layer_spec)
     return ld
   end
 
   def output(layer_spec, layer_data)
 
-    raise("'output' method: second parameter must be a geometry object") unless layer_data.kind_of?(LayoutData)
+    raise("'output' method: second parameter must be a geometry object") unless layer_data.kind_of?(LayoutData2)
 
     ls = string_to_layerinfo(layer_spec)
     li = @target_layout.insert_layer(ls)
@@ -561,6 +578,21 @@ class XSectionGenerator2
 
   def deposit(*args)
     all.grow(*args)
+  end
+  
+  def spacer(*args)
+	(xy, z, into, through, on, taper, bias, mode, buried) = all.spacer_arg(*args)
+			
+		if !on
+		  raise "'spacer' method: requires an 'on' specification"
+		end
+
+		spacer_first_layer = deposit(z, xy, :mode => mode, :on => on)
+		all.etch((z*2), (xy/2), :mode => mode, :into => [spacer_first_layer])
+	
+		spacer_second_layer = all.grow((z), (xy/2), :mode => mode, :on => [spacer_first_layer])
+		
+		spacer_first_layer = spacer_first_layer.or(spacer_second_layer)
   end
 
   def grow(*args)
@@ -654,7 +686,7 @@ class XSectionGenerator2
               downto = v
             end
             downto.each do |i|
-              if !i.kind_of?(LayoutData) # should be MaterialData @@@
+              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
                 raise "'#{method}' method: 'into' expects a material parameter or an array of such"
               end
             end
@@ -665,7 +697,7 @@ class XSectionGenerator2
               into = v
             end
             into.each do |i|
-              if !i.kind_of?(LayoutData) # should be MaterialData @@@
+              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
                 raise "'#{method}' method: 'into' expects a material parameter or an array of such"
               end
             end
@@ -741,7 +773,7 @@ class XSectionGenerator2
         removed_box = RBA::Box.new(-@extend, to - less, @line_dbu.length + @extend, self.height_dbu)
       end
       
-      rem = LayoutData::new([], self)
+      rem = LayoutData2::new([], self)
       into.each do |i|
         rem.add(i.andp([RBA::Polygon.new(removed_box)]))
         i.subp([RBA::Polygon.new(removed_box)])
@@ -783,7 +815,7 @@ class XSectionGenerator2
     air_border = @ep.safe_boolean_to_polygon(air_sized, air, RBA::EdgeProcessor::mode_anotb, true, true)
     mask_data = @ep.safe_boolean_to_polygon(air_border, mask_polygons, RBA::EdgeProcessor::mode_and, true, true)
 
-    return MaterialData.new(mask_data, self, @delta)
+    return MaterialData2.new(mask_data, self, @delta)
 
   end
 
@@ -858,7 +890,7 @@ class XSectionGenerator2
   end
 
   def bulk
-    MaterialData.new(@bulk.data, self, 0)
+    MaterialData2.new(@bulk.data, self, 0)
   end
 
   def dbu
@@ -866,9 +898,9 @@ class XSectionGenerator2
   end
 
   def layers_file(lyp_file)
-	# if lyp_file == ""
-		@lyp_file = File.join(@file_path, ".lyp")
-	# else 
+	# # if lyp_file == ""
+		# @lyp_file = File.join(@file_path, ".lyp")
+	# # else 
 		# @lyp_file = lyp_file
   end
 
@@ -910,9 +942,9 @@ private
 
   def update_basic_regions
     @area = RBA::Box.new(-@extend, -@depth - @below, @line_dbu.length + @extend, @height)
-    @air = MaterialData.new([RBA::Polygon.new(RBA::Box.new(-@extend, 0, @line_dbu.length + @extend, @height))], self, 0)
-    @air_below = MaterialData.new([RBA::Polygon.new(RBA::Box.new(-@extend, -@depth - @below, @line_dbu.length + @extend, -@depth))], self, 0)
-    @bulk = MaterialData.new([RBA::Polygon.new(RBA::Box.new(-@extend, -@depth, @line_dbu.length + @extend, 0))], self, 0)
+    @air = MaterialData2.new([RBA::Polygon.new(RBA::Box.new(-@extend, 0, @line_dbu.length + @extend, @height))], self, 0)
+    @air_below = MaterialData2.new([RBA::Polygon.new(RBA::Box.new(-@extend, -@depth - @below, @line_dbu.length + @extend, -@depth))], self, 0)
+    @bulk = MaterialData2.new([RBA::Polygon.new(RBA::Box.new(-@extend, -@depth, @line_dbu.length + @extend, 0))], self, 0)
     @roi = RBA::Box.new(0, -@depth - @below, @line_dbu.length, @height)
   end
 
@@ -937,7 +969,7 @@ private
     end
 
     if nrulers == 0
-      RBA::MessageBox::critical("Error", "No ruler present for the cross section line", RBA::MessageBox::b_ok)
+      RBA::MessageBox::critical("Error", "No ruler present for the cross section lines", RBA::MessageBox::b_ok)
       return
     end
     if nrulers > 1
@@ -986,7 +1018,7 @@ end
 # ----------------------------------------------------------------
 # A special action to implement the cross section MRU menu item
 
-class XSectionMRUAction < RBA::Action
+class XSectionMRUAction2 < RBA::Action
 
   def initialize(&action)
     @action = action
@@ -1034,7 +1066,7 @@ class XSection2gScriptEnvironment
         
       fn = RBA::FileDialog::get_open_file_name("Select Script", "", "XSection Scripts (*.xs);;All Files (*)");
       if fn.has_value?
-        file_path = run_script(fn.value)
+        file_path = run_script2(fn.value)
         make_mru(fn.value)
       end
 
@@ -1049,8 +1081,8 @@ class XSection2gScriptEnvironment
     @mru_actions = []
     (1..4).each do |i|
 
-      a = XSectionMRUAction.new do |action|
-        run_script(action.script)
+      a = XSectionMRUAction2.new do |action|
+        run_script2(action.script)
         make_mru(action.script)
       end
 
@@ -1090,7 +1122,7 @@ class XSection2gScriptEnvironment
 
   end
 
-  def run_script(fn)
+  def run_script2(fn)
 
     view = RBA::Application.instance.main_window.current_view
     if !view
