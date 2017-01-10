@@ -22,6 +22,11 @@
 # RBA does not recognize the empty array as an array of polygons and then there is
 # an ambiguity between the edge-input and polygon input variants
 # Thus this extension which checks for empty input and performs some default operation:
+
+# Version 2.0 DR 
+	# - layer properties file handling changed, def layers_file(lyp_file)
+	# - spacer function added
+
 class RBA::EdgeProcessor
   def safe_boolean_to_polygon(pa, pb, mode, rh, mc)
     if pa.length > 0 && pb.length > 0
@@ -300,65 +305,68 @@ class MaterialData2 < LayoutData2
     bias = nil
     buried = nil
     mode = :square
+	keepout = nil
 
     args.each do |a|
-      if a.kind_of?(Hash)
-        a.each_pair do |k,v|
-          if k == :into
-            if !v.kind_of?(Array)
-              into = [v]
-            else
-              into = v
-            end
-            into.each do |i|
-              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
-                raise "'#{method}' method: 'into' expects a material parameter or an array of such"
-              end
-            end
-          elsif k == :on
-            if !v.kind_of?(Array)
-              on = [v]
-            else
-              on = v
-            end
-            on.each do |i|
-              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
-                raise "'#{method}' method: 'on' expects a material parameter or an array of such"
-              end
-            end
-          elsif k == :through
-            if !v.kind_of?(Array)
-              through = [v]
-            else
-              through = v
-            end
-            through.each do |i|
-              if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
-                raise "'#{method}' method: 'through' expects a material parameter or an array of such"
-              end
-            end
-          elsif k == :mode
-            mode = v
-            if v != :round && v != :square && v != :octagon
-              raise "'#{method}' method: 'mode' expects ':round', ':square' or ':octagon'"
-            end
-          elsif k == :buried
-            buried = v.to_f
-          elsif k == :taper
-            taper = v.to_f
-          elsif k == :bias
-            bias = v.to_f
-          else
-            raise "'#{method}' method: undefined parameter key '#{k}'"
-          end
-        end
-      elsif !z
-        z = a.to_f
-      elsif !xy
-        xy = a.to_f
-      else
-        raise "Too many arguments for '#{method}' method"
-      end
+		if a.kind_of?(Hash)
+			a.each_pair do |k,v|
+			if k == :into
+				if !v.kind_of?(Array)
+					into = [v]
+				else
+					into = v
+				end
+				into.each do |i|
+					if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
+						raise "'#{method}' method: 'into' expects a material parameter or an array of such"
+					end
+				end
+			elsif k == :on
+				if !v.kind_of?(Array)
+					on = [v]
+				else
+					on = v
+				end
+				on.each do |i|
+					  if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
+							raise "'#{method}' method: 'on' expects a material parameter or an array of such"
+					  end
+				end
+			elsif k == :through
+				if !v.kind_of?(Array)
+					through = [v]
+				else
+					through = v
+				end
+				through.each do |i|
+					  if !i.kind_of?(LayoutData2) # should be MaterialData2 @@@
+							raise "'#{method}' method: 'through' expects a material parameter or an array of such"
+					  end
+				end
+			elsif k == :mode
+				mode = v
+				if v != :round && v != :square && v != :octagon
+					raise "'#{method}' method: 'mode' expects ':round', ':square' or ':octagon'"
+				end
+			elsif k == :buried
+				buried = v.to_f
+			elsif k == :taper
+				taper = v.to_f
+			elsif k == :bias
+				bias = v.to_f
+			elsif k == :keepout
+				
+			else
+				raise "'#{method}' method: undefined parameter key '#{k}'"
+			end
+			end
+		elsif !z
+			z = a.to_f
+		elsif !xy
+			xy = a.to_f
+		else
+			raise "Too many arguments for '#{method}' method"
+		end
     end
 
     if !z
@@ -522,7 +530,7 @@ class MaterialData2 < LayoutData2
 
 	def spacer_arg(*args)
 		# parse the arguments
-		(xy, z, into, through, on, taper, bias, mode, buried) = parse_grow_etch_args(args, :grow)
+		(xy, z, into, through, on, taper, bias, mode, buried) = parse_grow_etch_args(args, :grow)	
 	end
   
 ###lvl2 functions end 
@@ -539,6 +547,7 @@ class XSectionGenerator2
     @lyp_file = nil
     @ep = RBA::EdgeProcessor.new
     @flipped = false
+	
 
   end
 
@@ -578,21 +587,6 @@ class XSectionGenerator2
 
   def deposit(*args)
     all.grow(*args)
-  end
-  
-  def spacer(*args)
-	(xy, z, into, through, on, taper, bias, mode, buried) = all.spacer_arg(*args)
-			
-		if !on
-		  raise "'spacer' method: requires an 'on' specification"
-		end
-
-		spacer_first_layer = deposit(z, xy, :mode => mode, :on => on)
-		all.etch((z*2), (xy/2), :mode => mode, :into => [spacer_first_layer])
-	
-		spacer_second_layer = all.grow((z), (xy/2), :mode => mode, :on => [spacer_first_layer])
-		
-		spacer_first_layer = spacer_first_layer.or(spacer_second_layer)
   end
 
   def grow(*args)
@@ -898,10 +892,41 @@ class XSectionGenerator2
   end
 
   def layers_file(lyp_file)
-	# # if lyp_file == ""
-		# @lyp_file = File.join(@file_path, ".lyp")
-	# # else 
-		# @lyp_file = lyp_file
+  
+	if File.exists?(lyp_file)
+		if File.fnmatch('*.lyp', lyp_file)
+			@lyp_file = lyp_file
+		else
+			@lyp_file = @file_path + ".lyp"
+		end
+	
+	elsif lyp_file.empty? || lyp_file == " "
+	RBA::MessageBox::info("Path Widths Changed", "lyp_file.empty? || lyp_file == " "", RBA::MessageBox::Ok)
+		@lyp_file = @file_path + ".lyp"
+		
+	elsif File.directory?(lyp_file)
+	RBA::MessageBox::info("Path Widths Changed", "File.directory?(lyp_file)", RBA::MessageBox::Ok)
+		(File.split(@file_path)).each do |i|
+			if !File.directory?(i)
+				@lyp_file = lyp_file + i + ".xs.lyp"
+			end
+        end
+		
+	elsif !File.directory?(lyp_file)
+		if File.fnmatch('*.lyp' '/',lyp_file)
+			@lyp_file = lyp_file
+		elsif File.fnmatch('*.lyp',lyp_file)
+			@lyp_file = (File.split(@file_path))[0]+ "/" + lyp_file 
+		else
+			@lyp_file = (File.split(@file_path))[0] +"/"+ lyp_file + ".xs.lyp"
+		end
+		
+	else
+		@lyp_file = @file_path + ".xs.lyp"	
+	end
+	# RBA::MessageBox::info("Path Widths Changed", " 234 #{@lyp_file}", RBA::MessageBox::Ok)
+
+	
   end
 
   # The basic generation method
@@ -932,6 +957,9 @@ class XSectionGenerator2
 
     RBA::Application.instance.main_window.cm_lv_add_missing #@@@
     if @lyp_file
+		if !File.exists?(@lyp_file)
+			@target_view.save_layer_props(@lyp_file)
+		end	
       @target_view.load_layer_props(@lyp_file)
     end
     @target_view.zoom_fit
@@ -1012,11 +1040,46 @@ private
     return true
 
   end
+ 
+ 
+ 
+ 
+def grow_spacer(*args)
+	(xy, z, into, through, on, taper, bias, mode, buried ) = all.spacer_arg(*args)
+	# RBA::MessageBox::info("Path Widths Changed", "Changed  #{xy} #{z} pa µm", RBA::MessageBox::Ok)
+	if !on
+		  raise "'spacer' method: requires an 'on' specification"
+	end
+	spacer_first_layer = deposit(z, xy, :mode => mode, :on => on)
+	all.etch((z*2), (xy/2), :mode => mode, :into => [spacer_first_layer])
+	
+	spacer_second_layer = all.grow((z), (xy/2), :mode => mode, :on => [spacer_first_layer])
+		
+	spacer_first_layer = spacer_first_layer.or(spacer_second_layer)
+end 
+    #
+  def spacer(keepout = nil, *args)
+	# (xy, z, into, through, on, taper, bias, mode, buried, keepout ) = all.spacer_arg(*args)
+	# RBA::MessageBox::info("Path Widths Changed", "Changed  #{xy} #{z} pa µm", RBA::MessageBox::Ok)
+
+		if keepout.kind_of?(LayoutData2)
+			lkeepout = mask(keepout).grow(0.55, 0.2)
+			lspacer = grow_spacer(*args)
+			planarize(:to => 0, :into => lkeepout)
+				
+		else
+			lspacer = grow_spacer(*args)
+		end
+		
+		return lspacer		
+  end
+
 
 end
 
 # ----------------------------------------------------------------
 # A special action to implement the cross section MRU menu item
+
 
 class XSectionMRUAction2 < RBA::Action
 
