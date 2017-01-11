@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <klayout-macro>
- <description/>
+ <description>LayerView</description>
  <version/>
  <category/>
  <prolog/>
  <epilog/>
  <doc/>
- <autorun>false</autorun>
+ <autorun>false</autorun> 
  <autorun-early>false</autorun-early>
  <shortcut/>
- <show-in-menu>false</show-in-menu>
- <group-name/>
- <menu-path/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>IFKM</group-name>
+ <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
  <dsl-interpreter-name/>
  <text>module MyMacro
- 
+ #http://www.klayout.de/doc/code/class_AbstractMenu.html
+ #http://www.klayout.de/0.22/doc/programming/traditional.html
   include RBA
 
   # load the UI file
@@ -42,7 +43,7 @@
     button.clicked do
         
     end
-  
+    tableWidget.setHorizontalHeaderItem(0,QTableWidgetItem::new("Name"))
   end
   
 
@@ -104,8 +105,12 @@ end
     
     end 
    
-    $cell_before = tableWidget.currentRow
-    spinBox.value = $cell_before
+    #$cell_before = tableWidget.currentRow
+    #spinBox.value = $cell_before
+  end
+  
+  tableWidget.itemChanged do
+    spinBox.value = spinBox.value + 1
   end
 
 end
