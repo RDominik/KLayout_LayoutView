@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category/>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>ruby</interpreter>
+ <dsl-interpreter-name/>
+ <text>module MyMacro
+
+  include RBA
+
+  # This class implements a dialog with a screenshot display area and a
+  # screenshot button
+  class LayerView &lt; QDialog
+  
+    include RBA
+
+    def initialize(parent = nil)
+
+      super
+
+      setWindowTitle("LayerView")
+
+      resize(200, 600)
+
+      layout = QGridLayout.new(self)
+     
+      setLayout(layout)
+      buttons = QGridLayout.new(self)
+      layout.addLayout(buttons,2,1)
+
+       tableWidget = QTableView.new(self)
+        layout.addWidget(tableWidget, 0, 0, 1, 2)
+       # 
+        b1 = QPushButton.new(self)
+        b1.text = "Viewing\nBonding Diagrams/BDF"
+        b1.minimumSize = QSize.new(50, 50)
+        layout.addWidget(b1, 1, 0, 1, 1)
+        b2 = QPushButton.new(self)
+        b2.text = "Viewing\n(Chip) Layout"
+        b2.minimumSize = QSize.new(50, 50)
+        layout.addWidget(b2, 1, 1, 1, 1)
+
+
+    end
+    
+    def table_setup
+      active_layout = RBA::LayoutView::current
+      activeLayer = active_layout.begin_layers
+  #Class LayerProperties
+      index = 0
+  
+      until activeLayer.at_end? do
+             
+        name = activeLayer.current.name
+        for i in 0..name.length
+               
+          if activeLayer.current.source[0] === name[i]
+            break
+          end
+        end
+        
+        for k in 0..activeLayer.current.source.to_s.length
+               
+          if activeLayer.current.source[k] === "@"
+            break
+          end
+    
+        end
+           
+              #######
+        tableWidget.setColumnCount(2)
+        tableWidget.setRowCount(index+1)
+        tableWidget.setItem(index,0,QTableWidgetItem::new(name[0..(i-1)]))
+        tableWidget.setItem(index,1,QTableWidgetItem::new(activeLayer.current.source[0..(k-1)]))
+        activeLayer = activeLayer.next
+        index = index + 1
+      end    
+  end
+
+  end
+
+  # Instantiate the dialog and make it visible initially.
+  # Passing the $main_window will make it stay on top of the main window.
+#  $dialog &amp;&amp; $dialog.destroy
+  $dialog = LayerView.new(Application::instance.main_window)
+  $dialog.show
+
+end
+</text>
+</klayout-macro>
