@@ -17,10 +17,83 @@
  <text>module MyMacro
 
   include RBA
+ $active_layout = RBA::LayoutView::current 
+class WidgetItem &lt; QTableWidgetItem
+end
+
+#class StringItem &lt; QString
+#end
+
+class LayerTable &lt; QTableWidget
+
+  def initialize(parent = nil)
+    self.setColumnCount(2)
+    self.setHorizontalHeaderLabels(["Name","Layer"])
+    $aLayerName = Array.new
+    activeLayer = $active_layout.begin_layers
+		#Class LayerProperties
+		index = 0
+	  
+		until activeLayer.at_end? do       
+			current_name = activeLayer.current.name
+        
+			for i in 0..current_name.length      
+				if activeLayer.current.source[0] === current_name[i]
+					break
+				end
+			end
+			
+			for k in 0..activeLayer.current.source.to_s.length    
+				if activeLayer.current.source[k] === "@"
+					break
+				end
+			end  
+                    
+                    self.setRowCount(index+1)
+                     $aLayerName[index] = current_name[0..(i-1)]
+                    self.setItem(index,0,WidgetItem::new(current_name[0..(i-1)]))
+                    self.setItem(index,1,WidgetItem::new(activeLayer.current.source[0..(k-1)]))
+                    activeLayer = activeLayer.next
+                    index = index + 1
+      end 
+		# self.setRowCount(3)
+  end
+  
+  def keyReleaseEvent(arg1)
+    
+    activeLayer = $active_layout.begin_layers
+   
+   
+   row = (self.currentRow)
+   
+  
+  
+      layer_name = self.item(row,0).text
+      layer = self.item(row,1).text
+      
+      for i in 0..row-1
+        activeLayer = activeLayer.next
+      end
+      lp = activeLayer.current.dup
+      if layer_name != ("" || " ")
+        lp.name = layer_name + " " + layer
+        lp.source_datatype = 0
+        $active_layout.replace_layer_node(activeLayer, lp)
+        $aLayerName[row] =  layer_name
+      else
+        if $aLayerName[row] != ("" || " ")
+          #self.setItem(row,0,WidgetItem::new($aLayerName[row+1]))
+         self.item(row,0).setText($aLayerName[row])
+        end
+      end
+      
+  end
+  
+end
 
   # This class implements a dialog with a screenshot display area and a
   # screenshot button
-  class LayerView &lt; QDialog
+class LayerView &lt; QDialog
   
     include RBA
 
@@ -30,68 +103,42 @@
 
       setWindowTitle("LayerView")
 
-      resize(200, 600)
+      resize(250, 600)
 
       layout = QGridLayout.new(self)
-     
+      #$active_layout = RBA::LayoutView::current
       setLayout(layout)
       buttons = QGridLayout.new(self)
       layout.addLayout(buttons,2,1)
 
-       tableWidget = QTableView.new(self)
-        layout.addWidget(tableWidget, 0, 0, 1, 2)
+      $tableWidget = LayerTable.new(self)
+      layout.addWidget($tableWidget, 0, 0, 1, 2)
        # 
-        b1 = QPushButton.new(self)
-        b1.text = "Viewing\nBonding Diagrams/BDF"
-        b1.minimumSize = QSize.new(50, 50)
-        layout.addWidget(b1, 1, 0, 1, 1)
-        b2 = QPushButton.new(self)
-        b2.text = "Viewing\n(Chip) Layout"
-        b2.minimumSize = QSize.new(50, 50)
-        layout.addWidget(b2, 1, 1, 1, 1)
-
+      b1 = QPushButton.new(self)
+      b1.text = "Save Layer\nProperties"
+      b1.minimumSize = QSize.new(50, 50)
+      b1.clicked do
+        fn = RBA::FileDialog::get_save_file_name("Save Layer Properties File", "", "Layer Properties file (*.lyp);;All Files (*)");
+        if fn.has_value?
+          $active_layout.save_layer_props( fn.to_s)
+        end
+      
+      end
+      layout.addWidget(b1, 1, 0, 1, 1)
+      b2 = QPushButton.new(self)
+      b2.text = "Viewing\n(Chip) Layout"
+      b2.minimumSize = QSize.new(50, 50)
+      layout.addWidget(b2, 1, 1, 1, 1)
+  
 
     end
-    
-    def table_setup
-      active_layout = RBA::LayoutView::current
-      activeLayer = active_layout.begin_layers
-  #Class LayerProperties
-      index = 0
-  
-      until activeLayer.at_end? do
-             
-        name = activeLayer.current.name
-        for i in 0..name.length
-               
-          if activeLayer.current.source[0] === name[i]
-            break
-          end
-        end
-        
-        for k in 0..activeLayer.current.source.to_s.length
-               
-          if activeLayer.current.source[k] === "@"
-            break
-          end
-    
-        end
-           
-              #######
-        tableWidget.setColumnCount(2)
-        tableWidget.setRowCount(index+1)
-        tableWidget.setItem(index,0,QTableWidgetItem::new(name[0..(i-1)]))
-        tableWidget.setItem(index,1,QTableWidgetItem::new(activeLayer.current.source[0..(k-1)]))
-        activeLayer = activeLayer.next
-        index = index + 1
-      end    
-  end
-
-  end
+	
+end
 
   # Instantiate the dialog and make it visible initially.
   # Passing the $main_window will make it stay on top of the main window.
-#  $dialog &amp;&amp; $dialog.destroy
+ 
+  $dialog &amp;&amp; $dialog.destroy
   $dialog = LayerView.new(Application::instance.main_window)
   $dialog.show
 
