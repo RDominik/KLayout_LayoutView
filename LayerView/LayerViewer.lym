@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <klayout-macro>
- <description/>
+ <description>LayerView</description>
  <version/>
  <category/>
  <prolog/>
@@ -9,9 +9,9 @@
  <autorun>false</autorun>
  <autorun-early>false</autorun-early>
  <shortcut/>
- <show-in-menu>false</show-in-menu>
- <group-name/>
- <menu-path/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>LayerView</group-name>
+ <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
  <dsl-interpreter-name/>
  <text>module MyMacro
@@ -24,39 +24,31 @@ end
 #class StringItem &lt; QString
 #end
 
+class TextEdit &lt; QTextEdit
+
+  def initialize(parent = nil)
+  end
+  
+  
+
+end
+
 class LayerTable &lt; QTableWidget
 
   def initialize(parent = nil)
     self.setColumnCount(2)
     self.setHorizontalHeaderLabels(["Name","Layer"])
     $aLayerName = Array.new
+    $aLayer = Array.new 
     activeLayer = $active_layout.begin_layers
 		#Class LayerProperties
-		index = 0
-	  
-		until activeLayer.at_end? do       
-			current_name = activeLayer.current.name
-        
-			for i in 0..current_name.length      
-				if activeLayer.current.source[0] === current_name[i]
-					break
-				end
-			end
-			
-			for k in 0..activeLayer.current.source.to_s.length    
-				if activeLayer.current.source[k] === "@"
-					break
-				end
-			end  
-                    
-                    self.setRowCount(index+1)
-                     $aLayerName[index] = current_name[0..(i-1)]
-                    self.setItem(index,0,WidgetItem::new(current_name[0..(i-1)]))
-                    self.setItem(index,1,WidgetItem::new(activeLayer.current.source[0..(k-1)]))
-                    activeLayer = activeLayer.next
-                    index = index + 1
-      end 
-		# self.setRowCount(3)
+    index = 0
+    until activeLayer.at_end? do 
+      self.setRowCount(index+1)
+      index = index + 1
+      activeLayer = activeLayer.next
+    end
+    reload  
   end
   
   def keyReleaseEvent(arg1)
@@ -69,12 +61,14 @@ class LayerTable &lt; QTableWidget
   
   
       layer_name = self.item(row,0).text
-      layer = self.item(row,1).text
+      layer = $aLayer[row]
+      layer_name = layer_name.delete "\s\n"
       
       for i in 0..row-1
         activeLayer = activeLayer.next
       end
       lp = activeLayer.current.dup
+      lp.source = $aLayer[row]
       if layer_name != ("" || " ")
         lp.name = layer_name + " " + layer
         lp.source_datatype = 0
@@ -86,7 +80,38 @@ class LayerTable &lt; QTableWidget
          self.item(row,0).setText($aLayerName[row])
         end
       end
+      self.item(row,1).setText($aLayer[row])
       
+  end
+  
+  def reload
+    activeLayer = $active_layout.begin_layers
+    #Class LayerProperties
+    row = 0
+	  
+    until activeLayer.at_end? do       
+      current_name = activeLayer.current.name
+          
+      for i in 0..current_name.length      
+        if activeLayer.current.source[0] === current_name[i]
+          break
+        end
+      end
+                          
+      for k in 0..activeLayer.current.source.to_s.length    
+        if activeLayer.current.source[k] === "@"
+          break
+        end
+      end  
+                      
+      $aLayerName[row] = current_name[0..(i-1)]
+      $aLayer[row] = activeLayer.current.source[0..(k-1)] 
+      self.setItem(row,0,WidgetItem::new(current_name[0..(i-1)]))
+      self.setItem(row,1,WidgetItem::new(activeLayer.current.source[0..(k-1)]))
+      activeLayer = activeLayer.next
+      row = row + 1
+    end 
+    
   end
   
 end
@@ -103,7 +128,7 @@ class LayerView &lt; QDialog
 
       setWindowTitle("LayerView")
 
-      resize(250, 600)
+      resize(500, 600)
 
       layout = QGridLayout.new(self)
       #$active_layout = RBA::LayoutView::current
@@ -126,9 +151,19 @@ class LayerView &lt; QDialog
       end
       layout.addWidget(b1, 1, 0, 1, 1)
       b2 = QPushButton.new(self)
-      b2.text = "Viewing\n(Chip) Layout"
+      b2.text = "Load Layer\nProperties"
       b2.minimumSize = QSize.new(50, 50)
+      b2.clicked do
+        fn = RBA::FileDialog::get_open_file_name("Load Layer Properties File", "", "Layer Properties file (*.lyp);;All Files (*)");
+        if fn.has_value?
+          $active_layout.load_layer_props( fn.to_s)
+          $tableWidget.reload
+        end
+      
+      end
       layout.addWidget(b2, 1, 1, 1, 1)
+      textInput = TextEdit.new(self)
+      layout.addWidget(textInput, 0, 2, 1, 2)
   
 
     end
@@ -138,8 +173,9 @@ end
   # Instantiate the dialog and make it visible initially.
   # Passing the $main_window will make it stay on top of the main window.
  
-  $dialog &amp;&amp; $dialog.destroy
+#  $dialog &amp;&amp; $dialog.destroy
   $dialog = LayerView.new(Application::instance.main_window)
+
   $dialog.show
 
 end
