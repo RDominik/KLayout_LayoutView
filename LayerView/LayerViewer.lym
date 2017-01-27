@@ -127,7 +127,7 @@ class LayerView &lt; QDialog
       super
 
       setWindowTitle("LayerView")
-
+      $PropertyDir = ""
       resize(500, 600)
 
       layout = QGridLayout.new(self)
@@ -143,9 +143,10 @@ class LayerView &lt; QDialog
       b1.text = "Save Layer\nProperties"
       b1.minimumSize = QSize.new(50, 50)
       b1.clicked do
-        fn = RBA::FileDialog::get_save_file_name("Save Layer Properties File", "", "Layer Properties file (*.lyp);;All Files (*)");
+        fn = RBA::FileDialog::get_save_file_name("Save Layer Properties File", $PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
         if fn.has_value?
           $active_layout.save_layer_props( fn.to_s)
+          $PropertyDir = fn.to_s
         end
       
       end
@@ -154,10 +155,11 @@ class LayerView &lt; QDialog
       b2.text = "Load Layer\nProperties"
       b2.minimumSize = QSize.new(50, 50)
       b2.clicked do
-        fn = RBA::FileDialog::get_open_file_name("Load Layer Properties File", "", "Layer Properties file (*.lyp);;All Files (*)");
+        fn = RBA::FileDialog::get_open_file_name("Load Layer Properties File", $PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
         if fn.has_value?
           $active_layout.load_layer_props( fn.to_s)
           $tableWidget.reload
+          $PropertyDir = fn.to_s
         end
       
       end
