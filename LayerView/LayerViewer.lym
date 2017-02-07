@@ -14,161 +14,281 @@
  <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
  <dsl-interpreter-name/>
- <text>module MyMacro
+ <text>module LayerView
 
-  include RBA
- $active_layout = RBA::LayoutView::current 
+include RBA
+  
+$active_layout = RBA::LayoutView::current 
+$mw = RBA::Application.instance.main_window
+$topcell = RBA::CellView::active.layout.top_cell
+
+ # # derivative class to use virtual methods
 class WidgetItem &lt; QTableWidgetItem
+
 end
 
-#class StringItem &lt; QString
-#end
-
+# # derivative class to use virtual methods
 class TextEdit &lt; QTextEdit
-
-  def initialize(parent = nil)
-  end
-  
-  
-
+	def initialize(parent = nil)
+	end
 end
 
+# # derivative class to use virtual methods
 class LayerTable &lt; QTableWidget
 
-  def initialize(parent = nil)
-    self.setColumnCount(2)
-    self.setHorizontalHeaderLabels(["Name","Layer"])
-    $aLayerName = Array.new
-    $aLayer = Array.new 
-    activeLayer = $active_layout.begin_layers
-		#Class LayerProperties
-    index = 0
-    until activeLayer.at_end? do 
-      self.setRowCount(index+1)
-      index = index + 1
-      activeLayer = activeLayer.next
-    end
-    reload  
-  end
+	def initialize(parent = nil)
+		self.setColumnCount(4)
+		self.setHorizontalHeaderLabels(["Name","Layer", "Area in um^2", "Area/Chip Area"])
+		@aLayerName = Array.new
+		@aLayer = Array.new 
+		reload  
+	end
   
-  def keyReleaseEvent(arg1)
+	def keyReleaseEvent(arg1)
+		update_LayerView(self.currentRow)  
+	end
+	
+	# # write the Layer name from the table into LayerView
+	def update_LayerView(row)
+		activeLayer = $active_layout.begin_layers
+		layer_name = self.item(row,0).text
+		layer = @aLayer[row]
+		layer_name = layer_name.delete "\s\n"
+      
+		for i in 0..row-1
+			activeLayer = activeLayer.next
+		end
+		lp = activeLayer.current.dup
+		lp.source = @aLayer[row]
+		if layer_name != ("" || " ")
+			lp.name = layer_name + " " + layer
+			lp.source_datatype = 0
+			$active_layout.replace_layer_node(activeLayer, lp)
+			@aLayerName[row] =  layer_name
+		else
+			if @aLayerName[row] != ("" || " ")
+				self.item(row,0).setText(@aLayerName[row])
+			end
+		end
+		self.item(row,1).setText(@aLayer[row])
+	end
     
-    activeLayer = $active_layout.begin_layers
-   
-   
-   row = (self.currentRow)
-   
+	def set_rows
+		activeLayer = $active_layout.begin_layers
+		index = 0
+		until activeLayer.at_end? do 
+			self.setRowCount(index+1)
+			index += 1
+			activeLayer = activeLayer.next
+		end
+	end
   
-  
-      layer_name = self.item(row,0).text
-      layer = $aLayer[row]
-      layer_name = layer_name.delete "\s\n"
-      
-      for i in 0..row-1
-        activeLayer = activeLayer.next
-      end
-      lp = activeLayer.current.dup
-      lp.source = $aLayer[row]
-      if layer_name != ("" || " ")
-        lp.name = layer_name + " " + layer
-        lp.source_datatype = 0
-        $active_layout.replace_layer_node(activeLayer, lp)
-        $aLayerName[row] =  layer_name
-      else
-        if $aLayerName[row] != ("" || " ")
-          #self.setItem(row,0,WidgetItem::new($aLayerName[row+1]))
-         self.item(row,0).setText($aLayerName[row])
-        end
-      end
-      self.item(row,1).setText($aLayer[row])
-      
-  end
-  
-  def reload
-    activeLayer = $active_layout.begin_layers
-    #Class LayerProperties
-    row = 0
-	  
-    until activeLayer.at_end? do       
-      current_name = activeLayer.current.name
-          
-      for i in 0..current_name.length      
-        if activeLayer.current.source[0] === current_name[i]
-          break
-        end
-      end
-                          
-      for k in 0..activeLayer.current.source.to_s.length    
-        if activeLayer.current.source[k] === "@"
-          break
-        end
-      end  
+	# # reload the layer information table
+    def reload
+        #Class LayerProperties
+        activeLayer = $active_layout.begin_layers
+        row = 0
+        set_rows
+     
+        until  activeLayer.at_end? do   
+       
+            current_name = activeLayer.current.name
+            # # remove the source information
+            for i in 0..current_name.length      
+                if activeLayer.current.source[0] === current_name[i]
+                    break
+                end
+            end
+            # # remove everything after @           
+            for k in 0..activeLayer.current.source.to_s.length    
+                if activeLayer.current.source[k] === "@"
+                    break
+                end
+            end  
                       
-      $aLayerName[row] = current_name[0..(i-1)]
-      $aLayer[row] = activeLayer.current.source[0..(k-1)] 
-      self.setItem(row,0,WidgetItem::new(current_name[0..(i-1)]))
-      self.setItem(row,1,WidgetItem::new(activeLayer.current.source[0..(k-1)]))
-      activeLayer = activeLayer.next
-      row = row + 1
-    end 
-    
-  end
+			@aLayerName[row] = current_name[0..(i-1)]
+			@aLayer[row] = activeLayer.current.source[0..(k-1)] 
+			self.setItem(row,0,WidgetItem::new(current_name[0..(i-1)]))
+			self.setItem(row,1,WidgetItem::new(activeLayer.current.source[0..(k-1)]))
+			self.setItem(row,2,WidgetItem::new(" "))
+			self.setItem(row,3,WidgetItem::new(" "))
+     
+			row = row + 1
+			activeLayer.next
+		end 
+		@aLayerName = @aLayerName[0..row-1] 
+		@aLayer = @aLayer[0..row-1]
+	end
   
+	def sort_input(ainput,col=0)
+		value_before = 0
+		ainput.each do |inp|
+			if inp.to_i != 0
+				for k in 0..@aLayer.length    
+					if (((@aLayer[k].to_s).split("/"))[0].to_i == inp.to_i  &amp;&amp; ((inp).include?("/") || (inp).to_i))
+						if col == 0 
+							@aLayerName[k] = value_before
+							self.item(k,col).setText(@aLayerName[k])
+							update_LayerView(k)
+						else
+							self.item(k,col).setText(value_before)	
+						end
+					end
+				end
+			end
+			value_before = inp
+		end
+	end
 end
 
-  # This class implements a dialog with a screenshot display area and a
-  # screenshot button
+  # This class implements the dialog with 
 class LayerView &lt; QDialog
-  
     include RBA
-
     def initialize(parent = nil)
+		super
+        @title = $mw.current_view.title
+    
+        setWindowTitle("LayerView " + @title)
+        @PropertyDir = ""
+		@ShapeCoDir = @title + ".txt"
+        shape_coor = Array.new
+        
+        resize(800, 600)
+    
+        layout = QGridLayout.new(self)
+        setLayout(layout)
+        buttons = QGridLayout.new(self)
+        layout.addLayout(buttons,2,1)
 
-      super
+        @tableWidget = LayerTable.new(self)
+        layout.addWidget(@tableWidget, 0, 0, 1, 2)
 
-      setWindowTitle("LayerView")
-      $PropertyDir = ""
-      resize(500, 600)
-
-      layout = QGridLayout.new(self)
-      #$active_layout = RBA::LayoutView::current
-      setLayout(layout)
-      buttons = QGridLayout.new(self)
-      layout.addLayout(buttons,2,1)
-
-      $tableWidget = LayerTable.new(self)
-      layout.addWidget($tableWidget, 0, 0, 1, 2)
-       # 
-      b1 = QPushButton.new(self)
-      b1.text = "Save Layer\nProperties"
-      b1.minimumSize = QSize.new(50, 50)
-      b1.clicked do
-        fn = RBA::FileDialog::get_save_file_name("Save Layer Properties File", $PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
-        if fn.has_value?
-          $active_layout.save_layer_props( fn.to_s)
-          $PropertyDir = fn.to_s
+        b1 = QPushButton.new(self)
+        b1.text = "Save Layer\nProperties"
+        b1.minimumSize = QSize.new(50, 50)
+        b1.clicked do
+            fn = RBA::FileDialog::get_save_file_name("Save Layer Properties File", @PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
+            if fn.has_value?
+                $active_layout.save_layer_props( fn.to_s)
+                @PropertyDir = fn.to_s
+            end
+          
         end
+    
+		layout.addWidget(b1, 1, 0, 1, 1)
       
-      end
-      layout.addWidget(b1, 1, 0, 1, 1)
-      b2 = QPushButton.new(self)
-      b2.text = "Load Layer\nProperties"
-      b2.minimumSize = QSize.new(50, 50)
-      b2.clicked do
-        fn = RBA::FileDialog::get_open_file_name("Load Layer Properties File", $PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
-        if fn.has_value?
-          $active_layout.load_layer_props( fn.to_s)
-          $tableWidget.reload
-          $PropertyDir = fn.to_s
+		b2 = QPushButton.new(self)
+		b2.text = "Load Layer\nProperties"
+		b2.minimumSize = QSize.new(50, 50)
+		b2.clicked do
+			fn = RBA::FileDialog::get_open_file_name("Load Layer Properties File", @PropertyDir, "Layer Properties file (*.lyp);;All Files (*)");
+			if fn.has_value?
+				$active_layout.load_layer_props( fn.to_s)
+				@tableWidget.reload
+				@PropertyDir = fn.to_s
+			end
+		end
+		layout.addWidget(b2, 1, 1, 1, 1)
+      
+		textInput = TextEdit.new(self)
+		b3 = QPushButton.new(self)
+		b3.text = "Read Layer\nText"
+		b3.minimumSize = QSize.new(50, 50)
+		b3.clicked do
+			input = textInput.toPlainText
+			@tableWidget.sort_input(input.split(" "))
+		end
+		layout.addWidget(b3, 1, 2, 1, 2)
+      
+		b4 = QPushButton.new(self)
+		b4.text = "Calc Layer\nArea"
+		b4.minimumSize = QSize.new(50, 50)
+		b4.clicked do  
+			area_perc = []
+			@tableWidget.sort_input(area_cal(area_perc),2)
+			@tableWidget.sort_input(area_perc,3)
+		end
+		layout.addWidget(b4, 2, 0, 1,1)
+		  
+		layout.addWidget(textInput, 0, 2, 1, 2)
+	end
+        
+    def area_cal(area_perc = [])
+        actualLayer =  $mw.current_view.begin_layers
+        cal_string = Array.new()
+        shape_coor = Array.new
+        i = 0
+	  
+        if !$mw.current_view
+            raise "No view selected"
         end
-      
-      end
-      layout.addWidget(b2, 1, 1, 1, 1)
-      textInput = TextEdit.new(self)
-      layout.addWidget(textInput, 0, 2, 1, 2)
-  
 
-    end
+        cv = $mw.current_view.active_cellview
+        dbu = cv.layout.dbu
+        if !cv || !cv.is_valid?
+            raise "No cell selected"
+        end
+        
+        chip = RBA::CellView::active.layout.top_cell.bbox.area* dbu * dbu
+        while !actualLayer.at_end? do
+	    li = actualLayer.current.layer_index
+	    layer_name = actualLayer.current.name
+	    
+            if layer_name == ""
+                layer_name = actualLayer.current.source.to_s   
+            end
+            if cv.layout.is_valid_layer?(li) 
+				
+				# # new layer to merge all shapes for the calculation
+                help_layer = cv.layout.insert_layer(RBA::LayerInfo::new(1,0))
+				atot = 0
+				
+                # creates a region containing all polygons from the cell's layer plus all the
+                # polygons from it's children.
+                region = RBA::Region::new($topcell.begin_shapes_rec( li ))
+        
+                # merges the polygons (in-place: the region is filled with the merged polygons)
+                region.merge
+        
+                # clears the input layer (in all cells) and puts the 
+                # merged polygons back into the cell
+                a = 0
+                $topcell.shapes(help_layer).insert(region)
+				
+                $topcell.shapes(help_layer).each do |s|
+                    if s.is_path? || s.is_polygon? || s.is_box?
+                        a += s.polygon.area
+                        shape_coor[i] = ({:x =&gt; s.polygon.bbox.center.x* dbu ,:y =&gt;  s.polygon.bbox.center.y* dbu ,:area =&gt; s.polygon.area* dbu * dbu, :layer =&gt; layer_name})
+                         i += 1
+                    end
+                end
+                atot = a
+                area_perc.push(sprintf("%.2f",(atot * dbu * dbu)/chip*100))
+                area_perc.push((actualLayer.current.source(true)).to_s) 
+                cal_string.push(sprintf("%.2f", (atot * dbu * dbu))) 
+                cal_string.push(sprintf("%-10s\t", (actualLayer.current.source(true).to_s))) 
+            end
+            if cv.layout.is_valid_layer?(help_layer) 
+                cv.layout.delete_layer(help_layer)
+            end
+	    actualLayer.next
+        end
+        
+        fn = RBA::FileDialog::get_save_file_name("Select a .txt File", @ShapeCoDir, "Text Documents (*.txt);;All Files (*)");
+            if fn.has_value?
+                if File.exists?(fn.to_s)  
+                    File.new(fn.to_s, "w")              
+                end
+                File.open(fn.to_s, "w") do |file|
+                    file.puts("X  ;   Y  ;   Area   ;  Layer")
+                    shape_coor.each do |coor|
+                        file.puts(coor[:x].to_s + ";" + coor[:y].to_s + ";" +  coor[:area].to_s + ";" + coor[:layer] )
+                    end            
+                end
+            @ShapeCoDir = fn.to_s
+            end
+            return cal_string
+       end
 	
 end
 
@@ -177,7 +297,6 @@ end
  
 #  $dialog &amp;&amp; $dialog.destroy
   $dialog = LayerView.new(Application::instance.main_window)
-
   $dialog.show
 
 end
