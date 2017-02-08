@@ -28,6 +28,12 @@ class WidgetItem &lt; QTableWidgetItem
 end
 
 # # derivative class to use virtual methods
+class ComboBox &lt; QComboBox
+	def initialize(parent = nil)
+	end
+end
+
+# # derivative class to use virtual methods
 class TextEdit &lt; QTextEdit
 	def initialize(parent = nil)
 	end
@@ -82,6 +88,10 @@ class LayerTable &lt; QTableWidget
 			activeLayer = activeLayer.next
 		end
 	end
+	
+	def get_layernames
+            @aLayer
+	end
   
 	# # reload the layer information table
     def reload
@@ -125,13 +135,15 @@ class LayerTable &lt; QTableWidget
 		ainput.each do |inp|
 			if inp.to_i != 0
 				for k in 0..@aLayer.length    
-					if (((@aLayer[k].to_s).split("/"))[0].to_i == inp.to_i  &amp;&amp; ((inp).include?("/") || (inp).to_i))
+					if (@aLayer[k] ==(inp.split("@"))[0] )
 						if col == 0 
 							@aLayerName[k] = value_before
 							self.item(k,col).setText(@aLayerName[k])
 							update_LayerView(k)
-						else
-							self.item(k,col).setText(value_before)	
+						else 
+							#if ((k+1).modulo(2)).zero?
+							    self.item(k,col).setText(value_before)
+                                                      #  end
 						end
 					end
 				end
@@ -151,13 +163,14 @@ class LayerView &lt; QDialog
         setWindowTitle("LayerView " + @title)
         @PropertyDir = ""
 		@ShapeCoDir = @title + ".txt"
-        shape_coor = Array.new
         
         resize(800, 600)
     
         layout = QGridLayout.new(self)
         setLayout(layout)
         buttons = QGridLayout.new(self)
+        textInput = TextEdit.new(self)
+        layercombo = ComboBox.new(self)
         layout.addLayout(buttons,2,1)
 
         @tableWidget = LayerTable.new(self)
@@ -190,7 +203,7 @@ class LayerView &lt; QDialog
 		end
 		layout.addWidget(b2, 1, 1, 1, 1)
       
-		textInput = TextEdit.new(self)
+		
 		b3 = QPushButton.new(self)
 		b3.text = "Read Layer\nText"
 		b3.minimumSize = QSize.new(50, 50)
@@ -205,20 +218,36 @@ class LayerView &lt; QDialog
 		b4.minimumSize = QSize.new(50, 50)
 		b4.clicked do  
 			area_perc = []
-			@tableWidget.sort_input(area_cal(area_perc),2)
+			@tableWidget.sort_input(area_cal(area_perc, layercombo.itemText(layercombo.currentIndex)),2)
 			@tableWidget.sort_input(area_perc,3)
+			area_perc.clear
 		end
-		layout.addWidget(b4, 2, 0, 1,1)
-		  
+		layout.addWidget(b4, 2, 0, 1,1) 
+
 		layout.addWidget(textInput, 0, 2, 1, 2)
+		@tableWidget .get_layernames.each do | name|
+		    layercombo.addItem(name)
+		end
+		layout.addWidget(layercombo, 2,1, 1, 1)
+				 
 	end
+    def get_layerindex(ref_layer)
+        activeLayer = $active_layout.begin_layers
         
-    def area_cal(area_perc = [])
+        while !actualLayer.at_end? do
+           if ((actualLayer.source.to_s).split("@"))[0] == ref_layer
+                return  actualLayer.current.layer_index
+           end
+             actualLayer.next
+        
+        end
+        
+    end
+    
+    def area_cal(area_perc = [], ref_layer)
         actualLayer =  $mw.current_view.begin_layers
         cal_string = Array.new()
-        shape_coor = Array.new
-        i = 0
-	  
+        
         if !$mw.current_view
             raise "No view selected"
         end
@@ -229,8 +258,21 @@ class LayerView &lt; QDialog
             raise "No cell selected"
         end
         
+        fn = RBA::FileDialog::get_save_file_name("Select a .txt File", @ShapeCoDir, "Text Documents (*.txt);;All Files (*)");
+        if fn.has_value?
+            if File.exists?(fn.to_s)  
+                 File.new(fn.to_s, "w")              
+            end
+            File.open(fn.to_s, "w") do |file|
+                file.puts("X  ;   Y  ;   Area   ;  Layer  ")        
+            end
+            @ShapeCoDir = fn.to_s
+        end
+        shape_coor = Array.new
         chip = RBA::CellView::active.layout.top_cell.bbox.area* dbu * dbu
         while !actualLayer.at_end? do
+            
+            i = 0
 	    li = actualLayer.current.layer_index
 	    layer_name = actualLayer.current.name
 	    
@@ -241,7 +283,6 @@ class LayerView &lt; QDialog
 				
 				# # new layer to merge all shapes for the calculation
                 help_layer = cv.layout.insert_layer(RBA::LayerInfo::new(1,0))
-				atot = 0
 				
                 # creates a region containing all polygons from the cell's layer plus all the
                 # polygons from it's children.
@@ -261,32 +302,32 @@ class LayerView &lt; QDialog
                         shape_coor[i] = ({:x =&gt; s.polygon.bbox.center.x* dbu ,:y =&gt;  s.polygon.bbox.center.y* dbu ,:area =&gt; s.polygon.area* dbu * dbu, :layer =&gt; layer_name})
                          i += 1
                     end
+                    s.destroy
                 end
-                atot = a
-                area_perc.push(sprintf("%.2f",(atot * dbu * dbu)/chip*100))
+                area_perc.push(sprintf("%.2f",(a * dbu * dbu)/chip*100))
                 area_perc.push((actualLayer.current.source(true)).to_s) 
-                cal_string.push(sprintf("%.2f", (atot * dbu * dbu))) 
+                cal_string.push(sprintf("%.2f", (a * dbu * dbu))) 
                 cal_string.push(sprintf("%-10s\t", (actualLayer.current.source(true).to_s))) 
             end
             if cv.layout.is_valid_layer?(help_layer) 
                 cv.layout.delete_layer(help_layer)
+                region.clear
+                region.destroy
             end
+             if fn.has_value?
+                File.open(fn.to_s, "a") do |file|
+                    shape_coor.each do |coor|
+                         if coor != nil
+                            file.puts(coor[:x].to_s + ";" + coor[:y].to_s + ";" +  coor[:area].to_s + ";" + coor[:layer] )
+                        end
+                    end            
+                end
+            end
+            a = 0
+            shape_coor.clear
 	    actualLayer.next
         end
         
-        fn = RBA::FileDialog::get_save_file_name("Select a .txt File", @ShapeCoDir, "Text Documents (*.txt);;All Files (*)");
-            if fn.has_value?
-                if File.exists?(fn.to_s)  
-                    File.new(fn.to_s, "w")              
-                end
-                File.open(fn.to_s, "w") do |file|
-                    file.puts("X  ;   Y  ;   Area   ;  Layer")
-                    shape_coor.each do |coor|
-                        file.puts(coor[:x].to_s + ";" + coor[:y].to_s + ";" +  coor[:area].to_s + ";" + coor[:layer] )
-                    end            
-                end
-            @ShapeCoDir = fn.to_s
-            end
             return cal_string
        end
 	
@@ -295,9 +336,10 @@ end
   # Instantiate the dialog and make it visible initially.
   # Passing the $main_window will make it stay on top of the main window.
  
-#  $dialog &amp;&amp; $dialog.destroy
+ # $dialog &amp;&amp; $dialog.destroy
   $dialog = LayerView.new(Application::instance.main_window)
   $dialog.show
+  
 
 end
 </text>
