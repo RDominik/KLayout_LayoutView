@@ -81,7 +81,11 @@ class LayoutData2
     @ep = RBA::EdgeProcessor.new
     @xs = xs
   end
-
+  
+  def empty?
+	return @polygons == []
+  end
+  
   def load(layout, cell, box, layer_spec)
 
     ls = string_to_layerinfo(layer_spec)
@@ -113,6 +117,7 @@ class LayoutData2
 
   end
 
+  
   def data
     @polygons
   end
@@ -256,6 +261,32 @@ class MaterialData2 < LayoutData2
       into.each do |i|
         i.sub(res)
         i.remove_slivers
+      end
+    else
+      @xs.air.sub(res)
+      @xs.air.remove_slivers
+    end
+
+    return res
+
+  end
+  
+  def implant(*args)
+
+    # parse the arguments
+    (xy, z, into, through, on, taper, bias, mode, buried) = parse_grow_etch_args(args, :implant)
+
+    # produce the geometry of the new material
+    d = produce_geom(xy, z, into, through, on, taper, bias, mode, buried, :implant)
+
+    # prepare the result
+    res = MaterialData2.new(d, @xs, 0)
+
+    # consume material
+    if into
+      into.each do |i|
+        (i.dup).sub(res)
+        (i.dup).remove_slivers
       end
     else
       @xs.air.sub(res)
@@ -592,6 +623,9 @@ class XSectionGenerator2
   def grow(*args)
     all.grow(*args)
   end
+  def implant(*args)
+    all.implant(*args)
+  end
 
   def etch(*args)
     all.etch(*args)
@@ -901,11 +935,10 @@ class XSectionGenerator2
 		end
 	
 	elsif lyp_file.empty? || lyp_file == " "
-	RBA::MessageBox::info("Path Widths Changed", "lyp_file.empty? || lyp_file == " "", RBA::MessageBox::Ok)
+
 		@lyp_file = @file_path + ".lyp"
 		
 	elsif File.directory?(lyp_file)
-	RBA::MessageBox::info("Path Widths Changed", "File.directory?(lyp_file)", RBA::MessageBox::Ok)
 		(File.split(@file_path)).each do |i|
 			if !File.directory?(i)
 				@lyp_file = lyp_file + i + ".xs.lyp"
@@ -1044,19 +1077,19 @@ private
  
  
  
-def grow_spacer(*args)
-	(xy, z, into, through, on, taper, bias, mode, buried ) = all.spacer_arg(*args)
-	# RBA::MessageBox::info("Path Widths Changed", "Changed  #{xy} #{z} pa µm", RBA::MessageBox::Ok)
-	if !on
-		  raise "'spacer' method: requires an 'on' specification"
-	end
-	spacer_first_layer = deposit(z, xy, :mode => mode, :on => on)
-	all.etch((z*2), (xy/2), :mode => mode, :into => [spacer_first_layer])
-	
-	spacer_second_layer = all.grow((z), (xy/2), :mode => mode, :on => [spacer_first_layer])
+	def grow_spacer(*args)
+		(xy, z, into, through, on, taper, bias, mode, buried ) = all.spacer_arg(*args)
+		# RBA::MessageBox::info("Path Widths Changed", "Changed  #{xy} #{z} pa µm", RBA::MessageBox::Ok)
+		if !on
+			  raise "'spacer' method: requires an 'on' specification"
+		end
+		spacer_first_layer = deposit(z, xy, :mode => mode, :on => on)
+		all.etch((z*2), (xy/2), :mode => mode, :into => [spacer_first_layer])
 		
-	spacer_first_layer = spacer_first_layer.or(spacer_second_layer)
-end 
+		spacer_second_layer = all.grow((z), (xy/2), :mode => mode, :on => [spacer_first_layer])
+			
+		spacer_first_layer = spacer_first_layer.or(spacer_second_layer)
+	end 
     #
   def spacer(keepout = nil, *args)
 	# (xy, z, into, through, on, taper, bias, mode, buried, keepout ) = all.spacer_arg(*args)
@@ -1075,6 +1108,7 @@ end
   end
 
 
+  
 end
 
 # ----------------------------------------------------------------
@@ -1166,7 +1200,7 @@ class XSection2gScriptEnvironment
         end
       end
     elsif home
-      fn = File.join(home, ".klayout-xsection")
+      fn = File.join(home, ".klayout-xsection2")
       begin
         File.open(fn, "r") do |file|
           file.readlines.each do |line|
