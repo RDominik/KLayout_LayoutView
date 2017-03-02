@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <klayout-macro>
- <description>Single Via Density</description>
+ <description>SingleViaDensity</description>
  <version/>
  <category/>
  <prolog/>
@@ -9,9 +9,9 @@
  <autorun>false</autorun>
  <autorun-early>false</autorun-early>
  <shortcut/>
- <show-in-menu>false</show-in-menu>
- <group-name/>
- <menu-path/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>DensityImage</group-name>
+ <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
  <dsl-interpreter-name/>
  <text>module SingleViaModule
@@ -35,6 +35,15 @@ include RBA
         def initialize(parent = nil)end
         def addItem ( arg1) super end
     end
+    class ProgressBar &lt; QProgressBar
+        def initialize(parent = nil)end
+        def text 
+            return " "
+        end
+        def sizeHint
+            return RBA::QSize.new(100, 10)
+        end
+    end
     
     # # derivative class to use virtual methods
 class TextEdit &lt; QTextEdit
@@ -53,10 +62,10 @@ end
             
             setWindowTitle("ViaDensity " + @title)
             setSizeGripEnabled(false)
-            resize(300, 100)
+            resize(400, 100)
            setMinimumSize(300,300)
             setMaximumSize(300, 300)
-            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint);
+            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
             
             layout = GridLayout.new(self)
             setLayout(layout)
@@ -78,6 +87,13 @@ end
     
             textInput = TextEdit.new(self)
             textInput.minimumSize = QSize.new(100, 80)
+            
+            @progress = ProgressBar.new(self)
+            @progress.setRange(0,100)
+            @progress.minimumSize = QSize.new(50, 20)
+            @progress.setVisible(true)
+            @progress.setTextVisible(false)
+            @progress.value = 0
             
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
             layout.addWidget(combo_via, 1, 0, 1, 1)
@@ -106,20 +122,19 @@ end
                 textInput.setPlainText(report)
                 helpl = $mw.current_view.active_cellview.layout.layer(RBA::LayerInfo::new(100,0))
                 $topcell.shapes( helpl).insert(region_single) 
-            #      if !$file_path == nil  then raise "No File path" end
-               #  File.open($file_path + @title + "_" + "ViaDensity.csv", "a") do |file|      
-                  #  file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
-                   # single_position.each do |point|
-                      #  value = point.x.to_s + ";"+  point.y.to_s
-                      #  file.puts(value)
-                    #end
-                 #end   
-                 puts Time.now
-                 puts Time.now - time_start
-             #    reload
-           #     via_on_metal("100/0", combo_metal.currentText)          
+                if !$file_path == nil  then raise "No File path" end
+                    File.open($file_path + @title + "_" + "ViaDensity.csv", "a") do |file|      
+                        file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
+                        single_position.each do |point|
+                            value = point.x.to_s + ";"+  point.y.to_s
+                            file.puts(value)
+                        end
+                    end   
+                 puts Time.now - time_start     
             end
             layout.addWidget(b1, 8, 0, 1, 1)
+            layout.addWidget(@progress, 10, 0, 1, 1)
+           
             reload
             @aLayer.each do | name|
                 combo_via.addItem(name)
@@ -188,13 +203,14 @@ end
             dbu = $mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
             cl = RBA::Layout.new
+            cl_cell = cl.create_cell("TOP")
             cl.dbu = dbu
             lay.layer_indices.each do |li|
                 cl.insert_layer_at(li, lay.get_info(li))
             end
             cl = lay.dup
             cl.flatten( $topcell.cell_index, -1,true)
-            topcell  = cl.top_cell    
+            topcell  =  cl.top_cell    
             cv = $mw.current_view.active_cellview
             iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
             region_via = RBA::Region::new()   
@@ -207,35 +223,48 @@ end
                 iter_vial.next
             end
 
-            region_metal = RBA::Region::new()       
+            region1 = RBA::Region::new()       
             tp = RBA::TilingProcessor::new
             tp.threads = 4
             tp.input("a1",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer))))
             tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2))))
-            tp.output("x1", region_metal)
-            tp.tile_size(100, 100)
+            tp.output("x1", region1)
+            tp.tile_size(50, 50)
             tp.queue("_output(x1, a1 &amp; a2)")
-            tp.execute("go")
+            tp.execute("1")
             tp.destroy
-            
-            region_connect = RBA::Region::new()   
+            cl.destroy
+            region_connect= RBA::Region::new()   
             tp = RBA::TilingProcessor::new
             tp.threads = 4
             tp.input("a1",region_via)
-            tp.input("a2",region_metal)
+            tp.input("a2",region1)
             tp.output("x1", region_connect)
-            tp.tile_size(100, 100)
-            tp.queue("_output(x1,(a2.select_interacting( a1)).merge)")
-            tp.execute("go")
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1,a2.select_interacting( a1))")
+            tp.execute("2")
             tp.destroy
+            @progress.value = 5
             
-            helpl = cv.layout.insert_layer(RBA::LayerInfo::new(400,0))
-            $topcell.shapes( helpl).insert(region_connect)
+        #    region_connect = RBA::Region::new()  
+       #     tp = RBA::TilingProcessor::new
+       #     tp.threads = 4
+          #  tp.input("b1",region2)
+          #  tp.output("y1", region_connect)
+           # tp.tile_size(500,500)
+           # tp.queue("_output(y1, b1.merge)")
+           # tp.execute("3")
+           # tp.destroy
+           # region_connect.merged_semantics = true
+            region_connect.merge
+          #  helpl = cv.layout.insert_layer(RBA::LayerInfo::new(400,0))
+       #     $topcell.shapes( helpl).insert(region_connect)
+            @progress.value = 10
             i = 0 
             region_connect.each do
                 i += 1
             end
-            
+            progress = i/90
             obj = 0
             max_via_shape = 0
 
@@ -243,7 +272,7 @@ end
                 x= 0
                 via_inside = 0
      
-                (region_via.inside(RBA::Region::new(polyg))).each do |via|
+                (region_via.interacting(RBA::Region::new(polyg))).each do |via|
                     x +=1
                     via_inside = via
                 end
@@ -253,6 +282,7 @@ end
                     single_position.push(via_inside.bbox.center*dbu)
                 end
                 obj += 1
+                @progress.value =10 + obj/progress
             end            
             value = [via_total, max_via_shape]
         end
@@ -271,130 +301,9 @@ end
                     metal_data[i] =  data
                 end
                 i += 1
-            end
-            
+            end   
              save_values(via_layer, metal_data, nrows, ncolumns)
         end
-###############################################################
-###############################################################        
-        def density_calculation(sel_layer, data, xw = 50, yw = 50)
-             lv = $mw.current_view
-            @xmin = 0    # left coordinate of the mapping area
-            @xmax = 0      # right coordinate of the mapping area
-            @ymin = 0         # bottom coordinate of the mapping area
-            @ymax = 0
-            @xw = xw     # horizontal window size
-            @yw = yw        # vertical window size    
-    
-            # obtain the pointers to the layout and cell 
-            lay = lv.active_cellview.layout
-            top = lv.active_cellview.cell_index
-            top_name = lay.cell_name(top)
-            top_bbox = lay.cell(top).bbox
-            dbu = lay.dbu
-            
-            chip_area(dbu)
-            input_layer = source_to_index(sel_layer)
-            
-            x = 0
-			# Start to collect the data:
-            #data = []
-			# proceed row by row
-			# (for each row we use the multi_clip_into which is more efficient than single clips per window)
-            nrows = 0
-            y = @ymin
-            while y &lt; @ymax-1e-6
-
-			# Prepare a new layout to receive the clips
-			# Hint: we need to clip all layers (clip does not support clipping of one layer alone currently).
-                cl = RBA::Layout.new
-                cl.dbu = dbu
-                lay.layer_indices.each do |li|
-                    cl.insert_layer_at(li, lay.get_info(li))
-                end
-
-                # Prepare the clip boxes for this row.
-                # Note: because clip only works with boxes that overlap the cell's bounding box currently, we
-                # have to operate with a subset of fields to support the general case.
-                 boxes = []
-                x = @xmin
-                ncolumns = 0
-                colstart = nil
-                while x &lt; @xmax-1e-6
-                    b = RBA::Box.new((0.5 + x / dbu).floor, (0.5 + y / dbu).floor, (0.5 + (x + @xw) / dbu).floor, (0.5 + (y + @yw) / dbu).floor);
-                    if b.overlaps?(top_bbox)
-                        colstart ||= ncolumns 
-                        boxes.push(b)
-                    end
-                    x += @xw
-                    ncolumns += 1
-                end
-
-                columns = []
-                ncolumns.times { columns.push(0.0) }
-    
-                if colstart
-                    col = colstart
-    			# Actually do the clip
-                    cells = lay.multi_clip_into(top, cl, boxes)
-
-                    ep = RBA::ShapeProcessor.new
-                    merged = RBA::Shapes.new
-
-                            # Compute the area within area box
-                    cells.each do |c|
-
-                            # merge the shapes to polygons and compute the area
-                        ep.merge(cl, cl.cell(c), input_layer, merged, true, 0, false, false)
-                        a = 0
-                        merged.each do |m|
-                            a += m.polygon.area
-                        end
-
-                            # compute and store the density
-                        a = a * dbu * dbu / (@xw *@xw)
-                        columns[col] = a
-
-                        col += 1
-                    end
-                end
-                columns.each { |d| data.push(d) }
-                y += @yw
-                nrows += 1
-            end
-            [nrows,ncolumns]
-        end
-###############################################################
-###############################################################        
-        def save_values(sel_layer, data, nrows, ncolumns)
-        
-            active_sel_layer = $active_layout.begin_layers
-            for i in 0..@aLayer.length-1      
-                if @aLayer[i] == sel_layer
-                    break
-                end
-                active_sel_layer.next
-            end
-        
-            if nrows * ncolumns &gt; 0
-                data_string = ""
-                File.open($file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + "_DensityMap.csv", "a") do |file|
-                    qimg = QImage.new(ncolumns,nrows,RBA::QImage_Format::Format_RGB32)
-                    for i in 0..nrows-1
-                        for k in 0..ncolumns-1
-                            value = data[k+i*ncolumns]
-                            data_string  += value.to_s + ";"
-                            value = (value*255).floor #value*256
-                            qimg.setPixel(k,i,((value*65536)+(value*256)+value))
-                        end
-                        file.puts(data_string)
-                        data_string.clear
-                    end
-                    qimg = qimg.mirrored(false,true)
-                    qimg.save($file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + ".bmp")
-                end
-            end		
-        end 
 ###############################################################
 ###############################################################                   
     end
