@@ -25,49 +25,7 @@
     $topcell = RBA::CellView::active.layout.top_cell
     $file_path = (RBA::CellView::active.filename) #.split($mw.current_view.title)[0]
     $lv = $mw.current_view
-    
-    @@aLayerName = Array.new
-    @@aLayer = Array.new
-    @@aLayerIndex = Array.new
-      
-    def reload
-            #Class LayerProperties
-        activeLayer = RBA::LayoutView::current.begin_layers
-        row = 0
-         
-        until  activeLayer.at_end? do   
-            current_name = activeLayer.current.name
-            # # remove the source information
-            for i in 0..current_name.length      
-                if activeLayer.current.source[0] === current_name[i]
-                    break
-                end
-            end
-                # # remove everything after @           
-            for k in 0..activeLayer.current.source.to_s.length    
-                if activeLayer.current.source[k] === "@"
-                    break
-                end
-            end  
-            @@aLayerName[row] = current_name[0..(i-1)]
-            @@aLayer[row] = activeLayer.current.source[0..(k-1)] 
-            @@aLayerIndex[row] = activeLayer.current.layer_index
-            activeLayer.next
-            row += 1
-        end 
-    end
-    
-    def source_to_index(layer_source)
-        active_sel_layer = $active_layout.begin_layers
-        for i in 0..@@aLayer.length-1      
-            if @@aLayer[i] == layer_source
-                break
-            end
-            active_sel_layer.next
-        end
-        active_sel_layer.current.layer_index
-    end
-    
+     
     # # derivative class to use virtual methods
     class ProgressBar &lt; QProgressBar
         def initialize(parent = nil)end
@@ -99,13 +57,11 @@
 
 class AreaCal &lt; QDialog
     include RBA
-    include AREAMODULE
 
     def initialize(parent = nil)
         super
         @title = ($mw.current_view.title).split("gds")[0]
-      
-        reload
+
         setWindowTitle("Area Calculations " + @title)
         resize(800, 600)
         setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint);
@@ -125,20 +81,19 @@ class AreaCal &lt; QDialog
         single_via_tab.setLayout(single_via_grid)
         layer_density_tab = RBA::QDialog::new(self)
         layer_density_tab.setLayout(layer_density_grid)
-        layer_area_tab = RBA::QDialog::new(self)
-        layer_area_tab.setLayout(layer_area_grid)
+      
         
         @tabWidget = TabWidget.new(self)
-        @tabWidget.insertTab(1, layer_density_tab, "Layer Density")
+        @tabWidget.insertTab(1, layer_density_tab, "Layer Area/Density")
         @tabWidget.insertTab(2, single_via_tab, "SingleVia")
-        @tabWidget.insertTab(3, layer_area_tab, "Layer Area")
+      
         
         layout.addWidget(@tabWidget, 0, 0, 1, 2)
         single_via_grid.addWidget($single_via, 1, 0, 1, 1)
-        single_via_grid.addItem(RBA::QSpacerItem::new(200,50,QSizePolicy::MinimumExpanding,QSizePolicy::MinimumExpanding))
+        single_via_grid.addItem(RBA::QSpacerItem::new(150,50,QSizePolicy::MinimumExpanding,QSizePolicy::MinimumExpanding))
         
         layer_density_grid.addWidget($layer_density, 1, 0, 1, 1)
-        layer_density_grid.addItem(RBA::QSpacerItem::new(200,50,QSizePolicy::MinimumExpanding,QSizePolicy::MinimumExpanding))
+    #    layer_density_grid.addItem(RBA::QSpacerItem::new(150,50,QSizePolicy::MinimumExpanding,QSizePolicy::MinimumExpanding))
         
       end
     end    
@@ -148,9 +103,7 @@ class AreaCal &lt; QDialog
 ###############################################################
 ###############################################################    
       class SingleVia &lt; QWidget
-          include RBA
-          include AREAMODULE
-          
+        include RBA
         def initialize(parent = nil, f = Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint )
             super  
         #    setSizeGripEnabled(false)
@@ -158,10 +111,13 @@ class AreaCal &lt; QDialog
             resize(400, 100)
             setMinimumSize(300,300)
             setMaximumSize(300, 500)
-            
+           
             layout = GridLayout.new(self)
             setLayout(layout)
-            
+            @aLayerName = Array.new
+            @aLayer = Array.new
+            @aLayerIndex = Array.new
+             reload
             combo_via = ComboBox.new(self)
             combo_via.minimumSize = QSize.new(100, 20)
             label_combo_via = QLabel.new(self)
@@ -193,9 +149,9 @@ class AreaCal &lt; QDialog
             layout.addWidget(combo_metal, 3, 0, 1, 1)
             layout.addWidget(label_combo_metal2, 4, 0, 1, 1)
             layout.addWidget(combo_metal2, 5, 0, 1, 1)
-            layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
+        #   layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
             layout.addWidget(textInput, 6, 0, 2, 1)
-            layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
+    #        layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
          
             b1 = QPushButton.new(self)
             b1.text = "Start"
@@ -211,8 +167,8 @@ class AreaCal &lt; QDialog
                 report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + single_via.to_s + "\n" + "Multiple Via count:" + (values[0]-single_via).to_s + "\n" + "Calculation Time:" + calc_time.to_s 
                 region_single = RBA::Region::new(boxes) 
                 textInput.setPlainText(report)
-                helpl = $mw.current_view.active_cellview.layout.layer(RBA::LayerInfo::new(100,0))
-                $topcell.shapes( helpl).insert(region_single) 
+              #  helpl = $mw.current_view.active_cellview.layout.layer(RBA::LayerInfo::new(100,0))
+               # $topcell.shapes( helpl).insert(region_single) 
                 if !$file_path == nil  then raise "No File path" end
                 File.open($file_path + @title + "_" + "ViaDensity.csv", "a") do |file|      
                     file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
@@ -225,11 +181,50 @@ class AreaCal &lt; QDialog
             end   
             layout.addWidget(b1, 8, 0, 1, 1)
             layout.addWidget(@progress, 10, 0, 1, 1)
-            combo_via.addItems(@@aLayer)
-            combo_metal.addItems(@@aLayer)
-            combo_metal2.addItems(@@aLayer)
+            combo_via.addItems(@aLayer)
+            combo_metal.addItems(@aLayer)
+            combo_metal2.addItems(@aLayer)
             
         end 
+ ###############################################################
+###############################################################         
+        def reload
+            #Class LayerProperties
+            activeLayer = RBA::LayoutView::current.begin_layers
+            row = 0
+             
+            until  activeLayer.at_end? do   
+                current_name = activeLayer.current.name
+                # # remove the source information
+                for i in 0..current_name.length      
+                    if activeLayer.current.source[0] === current_name[i]
+                        break
+                    end
+                end
+                    # # remove everything after @           
+                for k in 0..activeLayer.current.source.to_s.length    
+                    if activeLayer.current.source[k] === "@"
+                        break
+                    end
+                end  
+                @aLayerName[row] = current_name[0..(i-1)]
+                @aLayer[row] = activeLayer.current.source[0..(k-1)] 
+                @aLayerIndex[row] = activeLayer.current.layer_index
+                activeLayer.next
+                row += 1
+            end 
+        end
+        
+        def source_to_index(layer_source)
+            active_sel_layer = $active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == layer_source
+                    break
+                end
+                active_sel_layer.next
+            end
+            active_sel_layer.current.layer_index
+        end
 ###############################################################
 ###############################################################         
         def via_dens(via_layer, metal_layer,metal_layer2 ,boxes,single_position)
@@ -241,21 +236,36 @@ class AreaCal &lt; QDialog
             lay.layer_indices.each do |li|
                 cl.insert_layer_at(li, lay.get_info(li))
             end
-            cl = lay
-            cl.flatten( $topcell.cell_index, -1,true)
+            cl = lay.dup
+            if cl.is_editable?
+                cl.flatten( $topcell.cell_index, -1,true)
+            end
             topcell  = cl.top_cell    
             cv = $mw.current_view.active_cellview
-            iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
+            
             region_via = RBA::Region::new()   
             via_total = 0
+          # poly_shapes = Array.new
+            iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
             while !iter_vial.at_end?
-               if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
-                   region_via.insert(iter_vial.shape.polygon)
-               end
-                via_total += 1
+                if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
+                    region_via.insert(iter_vial.shape.polygon)
+          #   if iter_vial.shape.is_box?
+             #       poly_shapes.push(iter_vial.shape.polygon.dup)
+                #    iter_vial.shape.polygon.destroy
+              end
+               via_total += 1
                 iter_vial.next
             end
-
+           iter_vial.destroy
+         #   topcell.each_shape(source_to_index(via_layer),RBA::Shapes::SAll) do |item|
+         #       if !item.is_path? &amp;&amp; !item.is_text? &amp;&amp; !item.is_polygon?
+          #          poly_shapes.push(item.polygon)   
+             #       via_total += 1
+          #      end
+       #     end
+         
+           # region_via = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(via_layer)))  
             region1 = RBA::Region::new()       
             tp = RBA::TilingProcessor::new
             tp.threads = 4
@@ -265,7 +275,7 @@ class AreaCal &lt; QDialog
             tp.tile_size(50, 50)
             tp.queue("_output(x1, a1 &amp; a2)")
             tp.execute("1")
-            tp.destroy
+          #  tp.destroy
             
             region_connect= RBA::Region::new()   
             tp = RBA::TilingProcessor::new
@@ -276,7 +286,7 @@ class AreaCal &lt; QDialog
             tp.tile_size(50, 50)
             tp.queue("_output(x1,a2.select_interacting( a1))")
             tp.execute("2")
-            tp.destroy
+     #       tp.destroy
             @progress.value = 5
 
             region_connect.merge
@@ -304,8 +314,11 @@ class AreaCal &lt; QDialog
                     single_position.push(via_inside.bbox.center*dbu)
                 end
                 obj += 1
-                @progress.value =10 + obj/progress
-            end            
+                if !progress
+                    @progress.value =10 + obj/progress
+                end
+            end         
+            @progress = 100   
             value = [via_total, max_via_shape]
         end
 ###############################################################
@@ -334,18 +347,19 @@ class AreaCal &lt; QDialog
 ###############################################################
 ###############################################################   
     class LayerDensity &lt; QDialog
-        include RBA
-        include AREAMODULE
-        
+        include RBA     
         def initialize(parent = nil)
             super
-            resize(300, 400)
+            resize(500, 500)
             @title = ($mw.current_view.title).split("gds")[0]
             layout = GridLayout.new(self)
             combogrid = GridLayout.new(self)
             spinboxgrid = GridLayout.new(self)
             setLayout(layout)
-
+            @aLayerName = Array.new
+            @aLayer = Array.new
+            @aLayerIndex = Array.new
+            reload
             @tree_source = ListWidget.new(self)
             @tree_density_layer = ListWidget.new(self)
             spinbox_resolution_x = QDoubleSpinBox.new
@@ -353,7 +367,10 @@ class AreaCal &lt; QDialog
             spinbox_resolution_y = QDoubleSpinBox.new
             label_res_y = QLabel.new(self)
             
-            @tree_source.minimumSize = QSize.new(50, 300)
+            combo_ref = ComboBox.new(self)
+            label_combo_ref = QLabel.new(self)
+            
+            @tree_source.minimumSize = QSize.new(50, 250)
             @tree_source.setSelectionMode( QAbstractItemView::ExtendedSelection)
             @tree_source.sortItems(Qt::AscendingOrder)
             @tree_source.doubleClicked do 
@@ -363,7 +380,7 @@ class AreaCal &lt; QDialog
                     end
             end
            # tree_source.sortingEnabled = (true)
-            @tree_density_layer.minimumSize = QSize.new(50, 300)
+            @tree_density_layer.minimumSize = QSize.new(50, 250)
             @tree_density_layer.setSelectionMode( QAbstractItemView::ExtendedSelection)
             @tree_density_layer.sortItems(Qt::AscendingOrder)
              @tree_density_layer.doubleClicked do 
@@ -373,26 +390,30 @@ class AreaCal &lt; QDialog
                     end
             end
           #  tree_density_layer.sortingEnabled = (true)
-
-            spinbox_resolution_x.minimumSize = QSize.new(125, 20)
+            label_combo_ref.text = "Geometry Reference Layer"
+            spinbox_resolution_x.minimumSize = QSize.new(50, 20)
             spinbox_resolution_x.value = 50
             label_res_x.text = "Density Resolution X"
-            spinbox_resolution_y.minimumSize = QSize.new(125, 20)
+            spinbox_resolution_y.minimumSize = QSize.new(50, 20)
             spinbox_resolution_y.value = 50
             label_res_y.text = "Density Resolution Y"
             
             layout.addWidget(@tree_source, 0, 0, 4, 1)
             layout.addWidget(@tree_density_layer, 0, 2, 4, 1)
-            
-            layout.addLayout(combogrid, 4, 0, 2, 1)
 
+            layout.addLayout(combogrid, 5, 0, 2, 1)
+            combogrid.addWidget(label_combo_ref, 0, 0, 1, 1)
+            combogrid.addWidget(combo_ref, 1,0, 1, 1)
+          #  combogrid.addItem(RBA::QSpacerItem::new(30,30,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
+            
             layout.addLayout(spinboxgrid, 4, 2, 2, 1)
             spinboxgrid.addWidget(label_res_x, 0, 1, 1, 1)
             spinboxgrid.addWidget(spinbox_resolution_x, 1, 1, 1, 1)
             spinboxgrid.addWidget(label_res_y, 2, 1, 1, 1)
             spinboxgrid.addWidget(spinbox_resolution_y, 3, 1, 1, 1)
             
-            @tree_source.addItems(@@aLayer)
+            @tree_source.addItems(@aLayer)
+            combo_ref.addItems(@aLayer)
                         
             b1 = QPushButton.new(self)
             b1.text = "-&gt;"
@@ -417,7 +438,7 @@ class AreaCal &lt; QDialog
 	    layout.addWidget(b2, 2, 1, 1, 1)
 	    
 	    b3 = QPushButton.new(self)
-            b3.text = "Start"
+            b3.text = "Calculate\nLayer Density"
 	    b3.minimumSize = QSize.new(20, 50)
 	    b3.clicked do
 	        @tree_density_layer.selectAll
@@ -427,18 +448,82 @@ class AreaCal &lt; QDialog
             end
 	    combogrid.addWidget(b3, 2, 0, 1, 1)
 	    
-	    b4 = QPushButton.new(self)
-	    b4.text = "Refresh\nLayer List"
+            b4 = QPushButton.new(self)
+	    b4.text = "Calculate\nLayer Area"
 	    b4.minimumSize = QSize.new(20, 50)
 	    b4.clicked do
+	        output = Array.new
+	        @tree_density_layer.selectAll
+                File.open($file_path + @title +  "_Area.csv", "a") do |file|
+                    file.puts("Area in % ; Area in mu^2 ; Layer ; " + (Time.now).to_s)
+                    @tree_density_layer.selectedItems.each do |item|
+                        file.puts(area_calculation(item.text,combo_ref.currentText))
+                    end
+                end
+	    end
+	    combogrid.addWidget(b4, 3, 0, 1, 1)   
+	    b5 = QPushButton.new(self)
+	    b5.text = "Refresh\nLayer List"
+	    b5.minimumSize = QSize.new(20, 50)
+	    b5.clicked do
 	        reload_trees
 	    end
-	    combogrid.addWidget(b4, 4, 0, 1, 1)
+	    combogrid.addWidget(b5, 4, 0, 1, 1)
+        end
+###############################################################
+###############################################################       
+        def reload
+            #Class LayerProperties
+            activeLayer = RBA::LayoutView::current.begin_layers
+            row = 0
+             
+            until  activeLayer.at_end? do   
+                current_name = activeLayer.current.name
+                # # remove the source information
+                for i in 0..current_name.length      
+                    if activeLayer.current.source[0] === current_name[i]
+                        break
+                    end
+                end
+                    # # remove everything after @           
+                for k in 0..activeLayer.current.source.to_s.length    
+                    if activeLayer.current.source[k] === "@"
+                        break
+                    end
+                end  
+                @aLayerName[row] = current_name[0..(i-1)]
+                @aLayer[row] = activeLayer.current.source[0..(k-1)] 
+                @aLayerIndex[row] = activeLayer.current.layer_index
+                activeLayer.next
+                row += 1
+            end 
+        end
+    
+        def source_to_index(layer_source)
+            active_sel_layer = $active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == layer_source
+                    break
+                end
+                active_sel_layer.next
+            end
+            active_sel_layer.current.layer_index
         end
 ###############################################################
 ###############################################################     
-        def chip_density_area(dbu)
-           
+        def chip_area(sel_layer,dbu)
+            cv = $mw.current_view.active_cellview
+            a = 0
+            region = RBA::Region::new($topcell.begin_shapes_rec(source_to_index(sel_layer)))
+            region.merge
+            @xmin =  region.bbox.p1.x*dbu
+            @ymin = region.bbox.p1.y*dbu
+            @xmax = region.bbox.p2.x*dbu
+            @ymax = region.bbox.p2.y*dbu
+            @xw = 50     # horizontal window size
+            @yw = 50        # vertical window size
+            a =  region.bbox.area
+            a*dbu*dbu 
         end
 ###############################################################
 ###############################################################    
@@ -461,12 +546,32 @@ class AreaCal &lt; QDialog
             @yw = yw        # vertical window size
            
             data = []
-            data_area = []
-            values = area_calc(sel_layer, data,data_area)
+            
+            values = layer_calc(sel_layer, data)
             save_density_map(sel_layer, values[0],values[1],data)  
         end
-    
-        def area_calc(sel_layer, data = [], data_area = [] ) 
+###############################################################
+###############################################################          
+        def area_calculation(sel_layer, ref_layer)
+            dbu = $lv.active_cellview.layout.dbu
+            chip = chip_area(sel_layer,dbu)
+            values = layer_calc(sel_layer)
+            a = values[2]
+            
+            active_sel_layer = $active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == sel_layer
+                    break
+                end
+                active_sel_layer.next
+            end
+            output = sprintf("%.2f ; ",(a )/chip*100)
+            output += sprintf("%.2f ; ", a)
+            output += ((active_sel_layer.current.source(true).split("@")[0])).to_s + " ; "
+        end
+###############################################################
+###############################################################      
+        def layer_calc(sel_layer, data = []) 
             if !$lv || !$lv.active_cellview
                 raise "Multiclip: No view or no layout active"
             end
@@ -474,6 +579,7 @@ class AreaCal &lt; QDialog
              raise "Multiclip: No layer selected"
             end
             x = 0
+            data_area = 0
             # obtain the pointers to the layout and cell 
             lay = $lv.active_cellview.layout
             top = $lv.active_cellview.cell_index
@@ -483,7 +589,7 @@ class AreaCal &lt; QDialog
             
             # identify the layer to take the density from
             input_layer = source_to_index(sel_layer)
-			# no such layer -&gt; error
+            # no such layer -&gt; error
             if !input_layer
                 raise "Multiclip: input layer #{layer.to_s} not found in input layout"
             end
@@ -519,7 +625,7 @@ class AreaCal &lt; QDialog
                     ncolumns += 1
                 end
                 columns = []
-                ncolumns.times { columns.push(0.0) }
+                ncolumns.times { columns.push(0.0)}
 
                 if colstart
                     col = colstart
@@ -536,7 +642,7 @@ class AreaCal &lt; QDialog
                             a += m.polygon.area
                         end
                             # compute and store the density
-                        data_area = a * dbu * dbu
+                        data_area += a * dbu * dbu
                         a = a * dbu * dbu / (@xw *@xw)
                         columns[col] = a
                         col += 1
@@ -546,14 +652,14 @@ class AreaCal &lt; QDialog
                 y += @yw
                 nrows += 1
             end
-            values = [nrows,ncolumns]
+            values = [nrows,ncolumns,data_area]
         end
 ###############################################################
 ###############################################################          
         def save_density_map(sel_layer, nrows, ncolumns,data = [])    
             active_sel_layer = $active_layout.begin_layers
-            for i in 0..@@aLayer.length-1      
-                if @@aLayer[i] == sel_layer
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == sel_layer
                     break
                 end
                 active_sel_layer.next
