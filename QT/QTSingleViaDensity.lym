@@ -115,7 +115,7 @@ end
                 @singlevia_polygon = Array.new
                 @singlevia_coordinates = Array.new
                 values = Array.new
-                values = via_dens(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,@singlevia_polygon,@singlevia_coordinates)
+                values = singlevia_calculation(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,@singlevia_polygon,@singlevia_coordinates)
                 data_to_file(@singlevia_polygon,@singlevia_coordinates, values,Time.now - time_start )  
             end
             layout.addWidget(b1, 8, 0, 1, 1)
@@ -213,22 +213,37 @@ end
         end
 ###############################################################
 ###############################################################              
-        def via_dens(via_layer, metal_layer,metal_layer2 ,singlevia_polygon,singlevia_coordinates)
+        def singlevia_calculation(via_layer, metal_layer,metal_layer2 ,singlevia_polygon,singlevia_coordinates)
             lv = @mw.current_view
             dbu = @mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
-            cl = RBA::Layout.new
-            cl_cell = cl.create_cell("TOP")
-            cl.dbu = dbu
-            lay.layer_indices.each do |li|
-                cl.insert_layer_at(li, lay.get_info(li))
-            end
-            cl = lay.dup
-            cl.flatten( @topcell.cell_index, -1,true)
-            topcell  =  cl.top_cell    
+            #cl = RBA::Layout.new
+            #cl_cell = cl.create_cell("TOP")
+            #cl.dbu = dbu
+            #lay.layer_indices.each do |li|
+                #cl.insert_layer_at(li, lay.get_info(li))
+            #end
+            #cl = lay.dup
+            #lay.flatten( @topcell.cell_index, -1,true)
+            lay.flatten( @topcell.cell_index, -1,true)
+            topcell  =  @topcell   
             cv = @mw.current_view.active_cellview
-            iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
+
             
+            metal_overlap = RBA::Region::new()       
+            tp = RBA::TilingProcessor::new
+            tp.threads = 4
+            tp.input("a1",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer))))
+            tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2))))
+            tp.output("x1", metal_overlap)
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1, a1 &amp; a2)")
+            tp.execute("1")
+            tp.destroy
+            metal_overlap.merge
+
+            
+            iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
             via_region = RBA::Region::new()   
             via_total = 0
             while !iter_vial.at_end?
@@ -239,12 +254,7 @@ end
                 iter_vial.next
             end
             
-            metal1 = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer)))
-            metal2 = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2)))
-            metal_overlap = metal1.&amp;(metal2)
-            metal1._destroy
-            metal2._destroy
-            
+            metal_overlap.merge
             metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
             metal_overlap._destroy
             via_region._destroy
@@ -259,7 +269,7 @@ end
             single_via_region = RBA::Region::new()
             max_via_shape = 0
             shape_counter = 0 
-            
+           
             @progress.value = 0
             metal_merged_over_via.each do |polygon|
             
