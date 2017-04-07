@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <klayout-macro>
- <description>SingleViaDensity</description>
+ <description/>
  <version/>
  <category/>
  <prolog/>
@@ -9,7 +9,7 @@
  <autorun>false</autorun>
  <autorun-early>false</autorun-early>
  <shortcut/>
- <show-in-menu>true</show-in-menu>
+ <show-in-menu>false</show-in-menu>
  <group-name>DensityImage</group-name>
  <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
@@ -86,15 +86,15 @@ end
             label_combo_metal2 = QLabel.new(self)
             label_combo_metal2.text = "Metal Layer 2"
     
-            @textInput = TextEdit.new(self)
-            @textInput.minimumSize = QSize.new(100, 80)
+            textInput = TextEdit.new(self)
+            textInput.minimumSize = QSize.new(100, 80)
             
-            @progress = ProgressBar.new(self)
-            @progress.setRange(0,100)
-            @progress.minimumSize = QSize.new(50, 20)
-            @progress.setVisible(true)
-            @progress.setTextVisible(false)
-            @progress.value = 0
+             @progress = ProgressBar.new(self)
+             @progress.setRange(0,100)
+             @progress.minimumSize = QSize.new(50, 20)
+             @progress.setVisible(true)
+             @progress.setTextVisible(false)
+             @progress.value = 0
             
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
             layout.addWidget(combo_via, 1, 0, 1, 1)
@@ -103,7 +103,7 @@ end
             layout.addWidget(label_combo_metal2, 4, 0, 1, 1)
             layout.addWidget(combo_metal2, 5, 0, 1, 1)
           #  layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
-            layout.addWidget(@textInput, 6, 0, 2, 1)
+            layout.addWidget(textInput, 6, 0, 2, 1)
           # layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
          
             
@@ -111,12 +111,13 @@ end
             b1.text = "Calculate SingleVia"
             b1.minimumSize = QSize.new(50, 50)
             b1.clicked do
-                time_start = Time.now
-                @singlevia_polygon = Array.new
-                @singlevia_coordinates = Array.new
+                puts time_start = Time.now
+                boxes = Array.new
+                single_position = Array.new
                 values = Array.new
-                values = via_dens(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,@singlevia_polygon,@singlevia_coordinates)
-                data_to_file(@singlevia_polygon,@singlevia_coordinates, values,Time.now - time_start )  
+                values = via_dens(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,boxes,single_position)
+                data_to_file(boxes, values)
+                puts Time.now - time_start     
             end
             layout.addWidget(b1, 8, 0, 1, 1)
              
@@ -130,8 +131,8 @@ end
                 single_position = Array.new
                 values = Array.new
                 values = via_dens(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,boxes,single_position)
-                #data_to_file(boxes, values)
-               # puts Time.now - time_start
+                data_to_file(boxes, values)
+                puts Time.now - time_start
            end
            layout.addWidget(b2, 10, 0, 1, 1)
            layout.addWidget(@progress, 12, 0, 1, 1)
@@ -148,14 +149,18 @@ end
         end           
 ###############################################################
 ###############################################################            
-        def data_to_file(singlevia_polygon, singlevia_coordinates, values, calc_time)
-            singlevia_count = singlevia_polygon.length
-            report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + singlevia_count.to_s + "\n" + "Multiple Via count:" + (values[0]-singlevia_count).to_s + "\n" + "Calculation Time:" + calc_time.to_s 
-            @textInput.setPlainText(report)
+        def data_to_file(boxes, values)
+            single_via = boxes.length
+            calc_time =Time.now - time_start
+            report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + single_via.to_s + "\n" + "Multiple Via count:" + (values[0]-single_via).to_s + "\n" + "Calculation Time:" + calc_time.to_s 
+             region_single = RBA::Region::new(boxes) 
+            textInput.setPlainText(report)
+            helpl = @mw.current_view.active_cellview.layout.layer(RBA::LayerInfo::new(100,0))
+            @topcell.shapes( helpl).insert(region_single) 
             if !@file_path == nil  then raise "No File path" end
             File.open(@file_path + @title + "_" + "ViaDensity.csv", "a") do |file|      
                 file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
-                singlevia_coordinates.each do |point|
+                single_position.each do |point|
                 value = point.x.to_s + ";"+  point.y.to_s
                     file.puts(value)
                 end
@@ -213,7 +218,7 @@ end
         end
 ###############################################################
 ###############################################################              
-        def via_dens(via_layer, metal_layer,metal_layer2 ,singlevia_polygon,singlevia_coordinates)
+        def via_dens(via_layer, metal_layer,metal_layer2 ,boxes,single_position)
             lv = @mw.current_view
             dbu = @mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
@@ -228,69 +233,79 @@ end
             topcell  =  cl.top_cell    
             cv = @mw.current_view.active_cellview
             iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
-            
-            via_region = RBA::Region::new()   
+            region_via = RBA::Region::new()   
             via_total = 0
             while !iter_vial.at_end?
                if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
-                   via_region.insert(iter_vial.shape.polygon)
+                   region_via.insert(iter_vial.shape.polygon)
                end
                 via_total += 1
                 iter_vial.next
             end
+            region_via.merge
+            iter_vial.destroy
+            region1 = RBA::Region::new()       
+            tp = RBA::TilingProcessor::new
+            tp.threads = 4
+            tp.input("a1",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer))))
+            tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2))))
+            tp.output("x1", region1)
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1, a1 &amp; a2)")
+            tp.execute("1")
+            tp.destroy
+            cl.destroy
+            region_connect= RBA::Region::new()   
+            tp = RBA::TilingProcessor::new
+            tp.threads = 4
+            tp.input("a1",region_via)
+            tp.input("a2",region1)
+            tp.output("x1", region_connect)
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1,a2.select_interacting( a1))")
+            tp.execute("2")
+            tp.destroy
+            @progress.value = 5
             
-            metal1 = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer)))
-            metal2 = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2)))
-            metal_overlap = metal1.&amp;(metal2)
-            metal1._destroy
-            metal2._destroy
-            
-            metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
-            metal_overlap._destroy
-            via_region._destroy
-
-           shape_interconnect = 0
-            
-            metal_merged_over_via.each do
-                shape_interconnect += 1
+        #    region_connect = RBA::Region::new()  
+       #     tp = RBA::TilingProcessor::new
+       #     tp.threads = 4
+          #  tp.input("b1",region2)
+          #  tp.output("y1", region_connect)
+           # tp.tile_size(500,500)
+           # tp.queue("_output(y1, b1.merge)")
+           # tp.execute("3")
+           # tp.destroy
+           # region_connect.merged_semantics = true
+            region_connect.merge
+          #  helpl = cv.layout.insert_layer(RBA::LayerInfo::new(400,0))
+       #     @topcell.shapes( helpl).insert(region_connect)
+            # @progress.value = 10
+            i = 0 
+            region_connect.each do
+                i += 1
             end
-            time_start = 0
-            puts time_start = Time.now
-            single_via_region = RBA::Region::new()
+            progress = i/90
+            obj = 0
             max_via_shape = 0
-            shape_counter = 0 
-            
-            @progress.value = 0
-            metal_merged_over_via.each do |polygon|
-            
-                 via_over_metal = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(via_layer), polygon.bbox))
-                 count_via = 0
-                 
-                 via_over_metal.each do
-                    count_via += 1
-                 end
-                 if count_via == 1
-                    @textInput.repaint
-                    via_over_metal.each do |polygon|
-                        singlevia_polygon.push(polygon)
-                        singlevia_coordinates.push(polygon.bbox.center)
-                    end     
-                elsif  count_via &gt;  max_via_shape
-                    max_via_shape = count_via       
-                end                 
-                shape_counter += 1
-                @progress.value = (shape_counter*100)/shape_interconnect
-                via_over_metal._destroy
-                
-                estimated_time = "\n estimated remaining time " + ((((Time.now-time_start) /shape_counter)*(shape_interconnect-shape_counter)).round(2)).to_s + " in seconds"
-                @textInput.setPlainText("Calculate Gate " + shape_counter.to_s + " out of " +  shape_interconnect.to_s + estimated_time)
-            end      
-            single_via_region = RBA::Region::new(singlevia_polygon)    
-            helpl = cv.layout.insert_layer(RBA::LayerInfo::new(400,0))
-            @topcell.shapes( helpl).insert(single_via_region)  
 
-            metal_merged_over_via._destroy
-            single_via_region._destroy
+            region_connect.each do |polyg| 
+                x= 0
+                via_inside = 0
+     
+                (region_via.interacting(RBA::Region::new(polyg))).each do |via|
+                    x +=1
+                    via_inside = via
+                end
+                if x &gt; max_via_shape then max_via_shape = x end
+                if x == 1   
+                    boxes.push(via_inside) 
+                    single_position.push(via_inside.bbox.center*dbu)
+                end
+                obj += 1
+                 @progress.value =10 + obj/progress
+            end            
+            @progress.value =100
             value = [via_total, max_via_shape]
         end
 ###############################################################

@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>AntennaRatio</description>
+ <version/>
+ <category/>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>DensityImage</group-name>
+ <menu-path>tools_menu.end</menu-path>
+ <interpreter>ruby</interpreter>
+ <dsl-interpreter-name/>
+ <text>module AntennaRatioModule
+ 
+include RBA
+  
+    
+    class TabWidget &lt; QTabWidget
+        def initialize(parent = nil) end
+    end
+    
+    class ComboBox &lt; QComboBox
+        def initialize(parent = nil)end
+    end
+    
+    class GridLayout &lt; QGridLayout
+        def initialize(parent = nil)end
+        def addItem ( arg1) super end
+    end
+    class ProgressBar &lt; QProgressBar
+        def initialize(parent = nil)end
+        def text 
+            return " "
+        end
+        def sizeHint
+            return RBA::QSize.new(100, 10)
+        end
+    end
+
+    # # derivative class to use virtual methods
+class TextEdit &lt; QTextEdit
+	def initialize(parent = nil) end
+end
+	
+class ListWidget &lt; QListWidget
+    def initialize(parent = nil) super end
+end  
+
+    
+    class AntennaRatio &lt; QDialog
+        include RBA
+        def initialize(parent = nil)
+            super
+            @active_layout = RBA::LayoutView::current 
+            @mw = RBA::Application.instance.main_window
+            @topcell = RBA::CellView::active.layout.top_cell
+            @file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
+    
+            @title = (@mw.current_view.title).split("gds")[0]
+            @aLayerName = Array.new
+            @aLayer = Array.new
+            @aLayerIndex = Array.new
+            dbu = @mw.current_view.active_cellview.layout.dbu
+                       
+            setWindowTitle("AntennaRatio" + @title)
+            setSizeGripEnabled(false)
+            resize(400, 100)
+            setMinimumSize(550,400)
+            setMaximumSize(550, 400)
+            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
+            
+            layout = GridLayout.new(self)
+            combogrid = GridLayout.new(self)
+            setLayout(layout)
+            
+            combo_active = ComboBox.new(self)
+            combo_active.minimumSize = QSize.new(20, 20)
+            label_combo_active = QLabel.new(self)
+            label_combo_active.text = "Active Layer"
+            
+            combo_poly = ComboBox.new(self)
+            combo_poly.minimumSize = QSize.new(20, 20)
+            label_combo_poly = QLabel.new(self)
+            label_combo_poly.text = "Poly Layer"
+            
+            label_metal_thickness = QLabel.new(self)
+            label_metal_thickness.text = "Metal thickness in µm"
+            spinbox_metal_thickness = QDoubleSpinBox.new
+            spinbox_metal_thickness.minimumSize = QSize.new(20, 20)
+            spinbox_metal_thickness.value = 1
+            ###########
+
+            tree_source = ListWidget.new(self)
+            tree_dest = ListWidget.new(self)
+            label_tree_dest = QLabel.new(self)
+            label_tree_dest.text = "Via Metal Layers ascending order"
+            
+            tree_source.minimumSize = QSize.new(50, 300)
+            tree_source.setSelectionMode( QAbstractItemView::ExtendedSelection)
+            tree_source.sortItems(Qt::AscendingOrder)
+            tree_source.doubleClicked do 
+                tree_source.selectedItems.each do |item|
+                        tree_dest.addItem(item.text)
+                        item.destroy
+                    end
+            end
+           # tree_source.sortingEnabled = (true)
+            tree_dest.minimumSize = QSize.new(50, 300)
+            tree_dest.setSelectionMode( QAbstractItemView::ExtendedSelection)
+            tree_dest.sortItems(Qt::AscendingOrder)
+             tree_dest.doubleClicked do 
+                tree_dest.selectedItems.each do |item|
+                        tree_source.addItem(item.text)
+                        item.destroy
+                    end
+            end
+            #########
+                        
+            layout.addWidget(tree_source, 1, 2, 6, 1)
+            layout.addWidget(tree_dest, 1, 4, 6, 1)
+            layout.addWidget(label_tree_dest, 0, 4, 1, 1)
+            
+            b1 = QPushButton.new(self)
+            b1.text = "-&gt;"
+	    b1.minimumSize = QSize.new(50, 50)
+	    b1.clicked do
+                    tree_source.selectedItems.each do |item|
+                        tree_density_layer.addItem(item.text)
+                        item.destroy
+                    end
+            end
+	    layout.addWidget(b1, 3, 3, 1, 1)
+	    
+            b2 = QPushButton.new(self)
+            b2.text = "&lt;-"
+	    b2.minimumSize = QSize.new(50, 50)
+	    b2.clicked do
+                tree_density_layer.selectedItems.each do |item|
+                    tree_source.addItem(item.text)
+                item.destroy 
+                end
+            end
+	    layout.addWidget(b2, 4, 3, 1, 1)
+            
+            @textInput = TextEdit.new(self)
+            @textInput.minimumSize = QSize.new(40, 100)
+            
+            @progress = ProgressBar.new(self)
+            @progress.setRange(0,100)
+            @progress.minimumSize = QSize.new(40, 20)
+            @progress.setVisible(true)
+            @progress.setTextVisible(false)
+            @progress.value = 0
+
+            combogrid.addWidget(label_combo_active, 1, 0, 1, 1)
+            combogrid.addWidget(combo_active, 2, 0, 1, 1)
+            combogrid.addWidget(label_combo_poly, 3, 0, 1, 1)
+            combogrid.addWidget(combo_poly, 4, 0, 1, 1)
+            combogrid.addWidget(label_metal_thickness, 5, 0, 1, 1)
+            combogrid.addWidget(spinbox_metal_thickness, 6, 0, 1, 1)
+          #  layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
+            combogrid.addWidget(@textInput, 8, 0, 1, 1)
+          # layout.addItem(RBA::QSpacerItem::new(20,20,QSizePolicy::Minimum,QSizePolicy::MinimumExpanding))
+         
+            layout.addLayout(combogrid, 1, 0, 6, 1)
+            b3 = QPushButton.new(self)
+            b3.text = "Start Calculation"
+            b3.minimumSize = QSize.new(20, 50)
+            b3.clicked do
+                @run = true   
+                metal_ratio = Array.new
+                via_ratio = Array.new 
+                gate_size = Array.new 
+                gate_position = Array.new
+                values = Array.new
+                tree_dest.selectAll
+                @textInput.setPlainText("Start Calculation")
+                @time_start = Time.now
+                via_dens(combo_active.currentText,combo_poly.currentText, tree_dest.selectedItems, spinbox_metal_thickness.value,  metal_ratio, via_ratio, gate_size, gate_position)
+                for i in 0..(gate_size.length-1)  
+                    for k in 0..((tree_dest.selectedItems).length/2)-1
+                        metal_ratio[k+i] = (((metal_ratio[k+i])*(spinbox_metal_thickness.value))/gate_size[i])
+                        via_ratio[k+i] = (((via_ratio[k+i]))/gate_size[i])
+                    end
+                end
+                @calc_time =Time.now - @time_start
+                data_to_file( metal_ratio, via_ratio, gate_size, gate_position,tree_dest.selectedItems)
+                @textInput.setPlainText("Calculation Complete in " + (Time.now - @time_start).to_s + " seconds" )   
+            end
+            layout.addWidget(b3, 8, 0, 1, 1)
+             
+           layout.addWidget(@progress, 12, 0, 1, 1)
+            reload
+            @aLayer.each do | name|
+                combo_active.addItem(name)
+            end
+            @aLayer.each do | name|
+                combo_poly.addItem(name)
+            end
+            @aLayer.each do | name|
+                tree_source.addItem(name)
+            end
+            
+          
+        end           
+###############################################################
+###############################################################            
+        def data_to_file(metal_ratio, via_ratio, gate_size, gate_position,metal_layers)
+            metal_counter = 0
+            File.open(@file_path + @title + "_" + "Antenna_Ratio.txt", "a") do |file| 
+                for i in 0..(gate_size.length-1)
+                    report = ""
+                    report += "Gate Position; " + gate_position[i].to_s + "; Gate Size; " + gate_size[i].to_s 
+                    for k in 0..(metal_layers.length/2)-1
+                        report += "; Ratio Metal" + (k+1).to_s+ " ; " + metal_ratio[metal_counter].to_s + " ;  Ratio Via" + (k).to_s+ " ; " + via_ratio[metal_counter].to_s
+                        metal_counter += 1
+                    end
+                    file.puts(report)
+                end 
+            end
+        end
+###############################################################
+###############################################################         
+        def reload
+            #Class LayerProperties
+            activeLayer = @active_layout.begin_layers
+            row = 0
+         
+            until  activeLayer.at_end? do   
+           
+                current_name = activeLayer.current.name
+                # # remove the source information
+                for i in 0..current_name.length      
+                    if activeLayer.current.source[0] === current_name[i]
+                        break
+                    end
+                end
+                # # remove everything after @           
+                for k in 0..activeLayer.current.source.to_s.length    
+                    if activeLayer.current.source[k] === "@"
+                        break
+                    end
+                end  
+                @aLayerName[row] = current_name[0..(i-1)]
+                @aLayer[row] = activeLayer.current.source[0..(k-1)] 
+                @aLayerIndex[row] = activeLayer.current.layer_index
+                activeLayer.next
+                row += 1
+            end 
+        end
+###############################################################
+###############################################################          
+        def source_to_index(layer_source)
+            active_sel_layer = @active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == layer_source
+                    break
+                end
+                active_sel_layer.next
+            end
+            active_sel_layer.current.layer_index
+        end
+###############################################################
+###############################################################    
+        def chip_area(dbu)
+            chip = @topcell.bbox
+            @xmin =  chip.p1.x*dbu
+            @ymin = chip.p1.y*dbu
+            @xmax = chip.p2.x*dbu
+            @ymax = chip.p2.y*dbu
+        end
+###############################################################
+###############################################################              
+        def via_dens(active_layer, poly_layer, metal_layers, metal_thickness, metal_ratio, via_ratio, gate_size, gate_position)
+        
+            interface_update = 10
+            
+            lv = @mw.current_view
+            dbu = @mw.current_view.active_cellview.layout.dbu
+            lay = lv.active_cellview.layout
+            cl = RBA::Layout.new
+            cl_cell = cl.create_cell("TOP")
+            cl.dbu = dbu
+            lay.layer_indices.each do |li|
+                cl.insert_layer_at(li, lay.get_info(li))
+            end
+            cl = lay.dup
+            cl.flatten( @topcell.cell_index, -1,true)
+            topcell  =  cl.top_cell    
+            cv = @mw.current_view.active_cellview
+
+            active = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(active_layer)))
+            poly = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(poly_layer)))
+            poly.merge
+            poly_merged_over_active = poly.select_interacting(active)
+
+            
+            shape_counter = 0
+            counter = 0           
+            
+            metals_merged= Array.new
+            sp = ShapeProcessor::new
+            count  = 0
+            for i in 0..(metal_layers.length/2)-1
+                metal_merged = RBA::Shapes::new
+                sp.merge(topcell.layout, topcell, source_to_index(metal_layers[count+1].text) , metal_merged, true, 0, false, false)
+                metals_merged.push(metal_merged)
+                count += 2
+            end
+            poly_merged_over_active.each do
+                shape_counter+=1
+            end
+            
+            time_start = Time.now
+            ## calculate the antenna ratio for every poly shape          
+            poly_merged_over_active.each do |polygon|
+                ## get the gate area
+            # Select the active area in the area of the poly net
+                active_over_polygon = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(active_layer), polygon.bbox))
+            
+              # Determine the total gate are on this net 
+                gate_region = RBA::Region::new(polygon) &amp; active_over_polygon
+                gate_size.push(gate_region.area*dbu*dbu)
+                puts gate_region.area*dbu*dbu
+                gate_position.push(gate_region.bbox.center*dbu)
+                gate_region._destroy
+                count  = 0
+                for i in 0..(metal_layers.length/2)-1
+                  # Select via inside the gate net by first selecting a subregion through
+                  # the gate net bounding box and then doing a boolean AND
+                    via_over_polygon = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(metal_layers[count].text), polygon.bbox))
+                    via_region = RBA::Region::new(polygon) &amp; via_over_polygon
+                
+                  # Select the metal net interacting with the vias
+                    metal_over_polygon = RBA::Region::new 
+                    # NOTE: with a Region for metal_merged we can get rid of this loop:
+                    (metals_merged[i]).each_overlapping(polygon.bbox) { |p| metal_over_polygon.insert(p.polygon) }
+                    metal_region = metal_over_polygon.select_interacting(via_region)
+                    metal_perimeter = 0
+                    metal_region.each do |pol|
+                        metal_perimeter += pol.perimeter
+                    end
+                    puts metal_perimeter*dbu
+                    puts via_region.area*dbu*dbu
+                    metal_ratio.push(metal_perimeter*dbu)
+                    
+                    via_ratio.push(via_region.area*dbu*dbu)
+                    metal_over_polygon._destroy
+                    count += 2
+                end
+
+                counter += 1
+                estimated_time = "\n estimated remaining time " + ((((Time.now-time_start) /counter)*(shape_counter-counter)).round(2)).to_s + " in seconds"
+                puts estimated_time
+                @textInput.setPlainText("Calculate Gate " + counter.to_s + " out of " +  shape_counter.to_s + estimated_time)
+                
+               @progress.value  = (counter*100)/shape_counter
+                if @progress.value == interface_update 
+                    @progress.repaint
+                    interface_update += 10
+                end
+            end
+            cl.destroy
+                       
+        end
+###############################################################
+###############################################################                              
+    end
+#    $dialog &amp;&amp; $dialog.destroy
+    $dialog = AntennaRatio.new(Application::instance.main_window)
+    $dialog.show
+
+end</text>
+</klayout-macro>
