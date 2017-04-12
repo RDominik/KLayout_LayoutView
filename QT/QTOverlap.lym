@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Overlap</description>
+ <version/>
+ <category/>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>AreaCal</group-name>
+ <menu-path>tools_menu.end</menu-path>
+ <interpreter>ruby</interpreter>
+ <dsl-interpreter-name/>
+ <text>module OverlapModule
+ 
+include RBA
+  
+    
+    class TabWidget &lt; QTabWidget
+        def initialize(parent = nil) end
+    end
+    
+    class ComboBox &lt; QComboBox
+        def initialize(parent = nil)end
+    end
+    
+    class GridLayout &lt; QGridLayout
+        def initialize(parent = nil)end
+        def addItem ( arg1) super end
+    end
+    class ProgressBar &lt; QProgressBar
+        def initialize(parent = nil)end
+        def text 
+            return " "
+        end
+        def sizeHint
+            return RBA::QSize.new(100, 10)
+        end
+    end
+    
+    # # derivative class to use virtual methods
+class TextEdit &lt; QTextEdit
+	def initialize(parent = nil) end
+end
+
+    
+    class Overlap &lt; QDialog
+        include RBA
+        def initialize(parent = nil)
+            super
+            @active_layout = RBA::LayoutView::current 
+            @mw = RBA::Application.instance.main_window
+            @topcell = RBA::CellView::active.layout.top_cell
+            @file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
+    
+            @title = (@mw.current_view.title).split("gds")[0]
+            @aLayerName = Array.new
+            @aLayer = Array.new
+            @aLayerIndex = Array.new
+            
+            setWindowTitle("ViaDensity " + @title)
+            setSizeGripEnabled(false)
+            resize(300, 100)
+            setMinimumSize(300,400)
+            setMaximumSize(300, 400)
+            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
+            
+            layout = GridLayout.new(self)
+            setLayout(layout)
+            calculate_grid = GridLayout.new(self)
+            
+            combo_via = ComboBox.new(self)
+            combo_via.minimumSize = QSize.new(100, 20)
+            label_combo_via = QLabel.new(self)
+            label_combo_via.text = "Via Layer"
+            
+            combo_metal = ComboBox.new(self)
+            combo_metal.minimumSize = QSize.new(100, 20)
+            label_combo_metal = QLabel.new(self)
+            label_combo_metal.text = "Metal Layer"
+
+            label_metal_overlap = QLabel.new(self)
+            label_metal_overlap.text = "Metal Overlap"
+            label_metal_smaller = QLabel.new(self)
+            label_metal_smaller.text = "&lt;="  
+            label_metal_greater = QLabel.new(self)
+            label_metal_greater.text = "&gt;="          
+            spinbox_metal_overlap = QDoubleSpinBox.new
+            spinbox_metal_overlap.minimumSize = QSize.new(20, 20)
+            spinbox_metal_overlap.setDecimals(3)
+            spinbox_metal_overlap.maximum=(1000)
+            spinbox_metal_overlap.setMinimum(0.0001)
+            spinbox_metal_overlap.value = 0.150  
+            spinbox_metal_overlap.suffix=(" µm")  
+            
+            spinbox_metal_overlap_min = QDoubleSpinBox.new
+            spinbox_metal_overlap_min.minimumSize = QSize.new(20, 20)
+            spinbox_metal_overlap_min.setDecimals(3)
+            spinbox_metal_overlap_min.maximum=(1000)
+            spinbox_metal_overlap_min.setMinimum(0.0001)
+            spinbox_metal_overlap_min.value = 0 
+            spinbox_metal_overlap_min.suffix=(" µm")  
+           
+            @textInput = TextEdit.new(self)
+            @textInput.minimumSize = QSize.new(100, 80)
+            
+            layout.addWidget(label_combo_via, 0, 0, 1, 1)
+            layout.addWidget(combo_via, 1, 0, 1, 1)
+            layout.addWidget(label_combo_metal, 2, 0, 1, 1)
+            layout.addWidget(combo_metal, 3, 0, 1, 1)
+
+            layout.addWidget(@textInput, 6, 0, 2, 1)
+
+            calculate_grid.addWidget(label_metal_overlap, 0, 0, 1, 1)
+            calculate_grid.addWidget(label_metal_smaller, 0, 1, 1, 1)  
+            calculate_grid.addWidget(spinbox_metal_overlap, 0, 2, 1, 1)   
+            calculate_grid.addWidget(label_metal_greater, 0, 3, 1, 1)  
+            calculate_grid.addWidget(spinbox_metal_overlap_min, 0, 4, 1, 1)       
+                                 
+            layout.addLayout(calculate_grid, 8, 0, 1, 1) 
+            
+            b1 = QPushButton.new(self)
+            b1.text = "Find Metal Overlap"
+            b1.minimumSize = QSize.new(30, 50)
+            b1.clicked do
+                time_start = Time.now
+                @overlap_polygon = Array.new
+                @overlap_coordinates = Array.new
+                overlap_calculation(combo_via.currentText, combo_metal.currentText, spinbox_metal_overlap.value, spinbox_metal_overlap_min.value ,@overlap_polygon,@overlap_coordinates)
+                overlap_count = @overlap_coordinates.length - 2
+                input_report = "Overlapping violations \n " + overlap_count.to_s + " EdgePairs smaller than " +  spinbox_metal_overlap.value.to_s + " µm " + " greater than " +  spinbox_metal_overlap_min.value.to_s + " µm \n"
+                input_report = input_report + "\n Via/Contact Layer: " + (combo_via.currentText).to_s + " Metal Layer: " + (combo_metal.currentText).to_s + " \n"
+                input_report = input_report +  "\n Visible in Layer500,  Add other Layer Entries \n Calculation time: " +  (Time.now - time_start).to_s 
+                @textInput.setPlainText(input_report)
+                @textInput.repaint
+                data_to_file(@overlap_polygon, @overlap_coordinates,  input_report )  
+            end
+            layout.addWidget(b1, 9, 0, 1, 1)
+            
+            reload
+            @aLayer.each do | name|
+                combo_via.addItem(name)
+            end
+            @aLayer.each do | name|
+                combo_metal.addItem(name)
+            end
+        end           
+###############################################################
+###############################################################            
+        def data_to_file(overlap_polygon, overlap_coordinates, input_report)
+            if !@file_path == nil  then raise "No File path" end
+            File.open(@file_path + @title + "_" + "OverlapViolations.csv", "a") do |file|      
+                file.puts( "\n \n" + Time.now.to_s + "\n \n" + input_report + "\n \n")
+                overlap_coordinates.each do |point|
+                value = point.x.to_s + ";"+  point.y.to_s
+                    file.puts(value)
+                end
+            end   
+        end
+###############################################################
+###############################################################         
+        def reload
+            #Class LayerProperties
+            activeLayer = @active_layout.begin_layers
+            row = 0
+         
+            until  activeLayer.at_end? do   
+           
+                current_name = activeLayer.current.name
+                # # remove the source information
+                for i in 0..current_name.length      
+                    if activeLayer.current.source[0] === current_name[i]
+                        break
+                    end
+                end
+                # # remove everything after @           
+                for k in 0..activeLayer.current.source.to_s.length    
+                    if activeLayer.current.source[k] === "@"
+                        break
+                    end
+                end  
+                @aLayerName[row] = current_name[0..(i-1)]
+                @aLayer[row] = activeLayer.current.source[0..(k-1)] 
+                @aLayerIndex[row] = activeLayer.current.layer_index
+                activeLayer.next
+                row += 1
+            end 
+        end
+###############################################################
+###############################################################          
+        def source_to_index(layer_source)
+            active_sel_layer = @active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == layer_source
+                    break
+                end
+                active_sel_layer.next
+            end
+            active_sel_layer.current.layer_index
+        end
+###############################################################
+###############################################################                 
+        def overlap_calculation(via_layer, metal_layer, overlap_d, overlap_d_min, overlap_polygon,overlap_coordinates)
+            lv = @mw.current_view
+            dbu = @mw.current_view.active_cellview.layout.dbu
+            lay = lv.active_cellview.layout
+            topcell  =  @topcell   
+            cv = @mw.current_view.active_cellview
+            @textInput.setPlainText("Start Calculation")
+            @textInput.repaint
+            overlap_d += dbu
+            
+            if overlap_d &lt;= overlap_d_min
+                raise "The lower limit need to be under " + overlap_d.to_s
+            end
+            
+            via_region = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(via_layer)))   
+
+            via_overlap = RBA::Region::new()
+            tp = RBA::TilingProcessor::new
+            tp.threads = 4
+            tp.input("a1", via_region.sized((overlap_d/dbu),2))
+            tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer))))
+            tp.output("x1", via_overlap)
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1, a1 &amp; a2)")
+            tp.execute("1")
+            tp._destroy
+            
+            metal_overlap = RBA::Region::new()
+            tp = RBA::TilingProcessor::new
+            tp.threads = 4
+            tp.input("a1", via_region)
+            tp.input("a2",via_overlap)
+            tp.output("x1", metal_overlap)
+            tp.tile_size(50, 50)
+            tp.queue("_output(x1, a2 - a1)")
+            tp.execute("1")
+            tp._destroy
+            via_region._destroy
+            via_overlap._destroy
+            min = ((overlap_d_min/2)/dbu)
+            metal_overlap.size(-min,-min,2)
+            metal_overlap.size(min,min,2)
+            
+            overlap_violation_edges = metal_overlap.width_check(overlap_d/dbu,false, nil,80,nil,nil)
+            metal_overlap._destroy
+
+            @textInput.setPlainText("Calculation finished\nStart Evaluation")
+            @textInput.repaint
+           
+            overlap_polygon.clear
+            overlap_coordinates.clear
+            
+            overlap_coordinates.push(@topcell.bbox.p1)
+            overlap_coordinates.push(@topcell.bbox.p2)
+            
+            overlap_violation_edges.each do |edge_pair|
+                #overlap_polygon.push(edge_pair.polygon(0))
+                overlap_coordinates.push(edge_pair.polygon(0).bbox.center)
+            end      
+            
+            helpl = cv.layout.layer(RBA::LayerInfo::new(500,0))
+            @topcell.layout.clear_layer(helpl)
+            @topcell.shapes( helpl).insert(overlap_violation_edges.polygons)  
+            overlap_violation_edges._destroy
+        end
+###############################################################
+###############################################################              
+                
+    end
+#    $dialog &amp;&amp; $dialog.destroy
+    $dialog = Overlap.new(Application::instance.main_window)
+    $dialog.show
+
+end</text>
+</klayout-macro>
