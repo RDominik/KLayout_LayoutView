@@ -51,10 +51,10 @@ end
         include RBA
         def initialize(parent = nil)
             super
-			@active_layout = RBA::LayoutView::current 
-			@mw = RBA::Application.instance.main_window
-			@topcell = RBA::CellView::active.layout.top_cell
-			@file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
+            @active_layout = RBA::LayoutView::current 
+            @mw = RBA::Application.instance.main_window
+            @topcell = RBA::CellView::active.layout.top_cell
+            @file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
     
             @title = (@mw.current_view.title).split("gds")[0]
             @aLayerName = Array.new
@@ -108,33 +108,21 @@ end
          
             
             b1 = QPushButton.new(self)
-            b1.text = "Calculate SingleVia"
+            b1.text = "Calculate SingleVia \n fast but memory intensive"
             b1.minimumSize = QSize.new(50, 50)
             b1.clicked do
-                time_start = Time.now
-                @singlevia_polygon = Array.new
-                @singlevia_coordinates = Array.new
-                values = Array.new
-                values = singlevia_calculation(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,@singlevia_polygon,@singlevia_coordinates)
-                data_to_file(@singlevia_polygon,@singlevia_coordinates, values,Time.now - time_start )  
+                calculation_settings(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText, true)
             end
             layout.addWidget(b1, 8, 0, 1, 1)
-             
-           
+                        
             b2 = QPushButton.new(self)
-            b2.text = "Calculate SingleVia\n(and Big Metal Plate connections)"
+            b2.text = "Calculate SingleVia\n slower but less memory intensive"
             b2.minimumSize = QSize.new(50, 50)
             b2.clicked do
-                puts time_start = Time.now
-                boxes = Array.new
-                single_position = Array.new
-                values = Array.new
-                values = via_dens(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText,boxes,single_position)
-                #data_to_file(boxes, values)
-               # puts Time.now - time_start
-           end
-           layout.addWidget(b2, 10, 0, 1, 1)
-           layout.addWidget(@progress, 12, 0, 1, 1)
+                calculation_settings(combo_via.currentText,combo_metal.currentText,combo_metal2.currentText, false)
+            end
+            layout.addWidget(b2, 10, 0, 1, 1)
+            layout.addWidget(@progress, 12, 0, 1, 1)
             reload
             @aLayer.each do | name|
                 combo_via.addItem(name)
@@ -145,15 +133,29 @@ end
             @aLayer.each do | name|
                 combo_metal2.addItem(name)
             end
-        end           
+        end       
+###############################################################
+###############################################################          
+        def calculation_settings(via_layer, metal_layer,metal_layer2, fast_cal)
+                time_start = Time.now
+                @singlevia_polygon = Array.new
+                @singlevia_coordinates = Array.new
+                values = Array.new
+                values = singlevia_calculation(via_layer, metal_layer,metal_layer2 , fast_cal,@singlevia_polygon,@singlevia_coordinates)
+                singlevia_count = @singlevia_polygon.length
+                data_path = @file_path + @title + "_" + "ViaDensity.csv"
+                report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + singlevia_count.to_s + "\n" 
+                report = report + "Multiple Via count:" + (values[0]-singlevia_count).to_s + "\n" + "Calculation Time:" + ( Time.now-time_start).to_s + " seconds" 
+                report = report + "\n data saved under " + data_path
+                @textInput.setPlainText(report)
+                @textInput.repaint
+                data_to_file(@singlevia_polygon,@singlevia_coordinates,report, data_path) 
+        end   
 ###############################################################
 ###############################################################            
-        def data_to_file(singlevia_polygon, singlevia_coordinates, values, calc_time)
-            singlevia_count = singlevia_polygon.length
-            report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + singlevia_count.to_s + "\n" + "Multiple Via count:" + (values[0]-singlevia_count).to_s + "\n" + "Calculation Time:" + calc_time.to_s 
-            @textInput.setPlainText(report)
+        def data_to_file(singlevia_polygon, singlevia_coordinates, report, data_path)
             if !@file_path == nil  then raise "No File path" end
-            File.open(@file_path + @title + "_" + "ViaDensity.csv", "a") do |file|      
+            File.open(data_path, "a") do |file|      
                 file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
                 singlevia_coordinates.each do |point|
                 value = point.x.to_s + ";"+  point.y.to_s
@@ -213,23 +215,14 @@ end
         end
 ###############################################################
 ###############################################################              
-        def singlevia_calculation(via_layer, metal_layer,metal_layer2 ,singlevia_polygon,singlevia_coordinates)
+        def singlevia_calculation(via_layer, metal_layer,metal_layer2 , fast_cal, singlevia_polygon,singlevia_coordinates)
             lv = @mw.current_view
             dbu = @mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
-            #cl = RBA::Layout.new
-            #cl_cell = cl.create_cell("TOP")
-            #cl.dbu = dbu
-            #lay.layer_indices.each do |li|
-                #cl.insert_layer_at(li, lay.get_info(li))
-            #end
-            #cl = lay.dup
             #lay.flatten( @topcell.cell_index, -1,true)
-            lay.flatten( @topcell.cell_index, -1,true)
             topcell  =  @topcell   
             cv = @mw.current_view.active_cellview
 
-            
             metal_overlap = RBA::Region::new()       
             tp = RBA::TilingProcessor::new
             tp.threads = 4
@@ -239,10 +232,9 @@ end
             tp.tile_size(50, 50)
             tp.queue("_output(x1, a1 &amp; a2)")
             tp.execute("1")
-            tp.destroy
+            tp._destroy
             metal_overlap.merge
-
-            
+            # via shape iterator
             iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer)))
             via_region = RBA::Region::new()   
             via_total = 0
@@ -253,15 +245,17 @@ end
                 via_total += 1
                 iter_vial.next
             end
-            
-            metal_overlap.merge
-            metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
-            metal_overlap._destroy
+            # destroy the unnecessary objects after calculation, save memory
+            if fast_cal
+                metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
+                metal_overlap._destroy
+           else
+                metal_merged_over_via = metal_overlap
+            end
             via_region._destroy
-
-           shape_interconnect = 0
+            shape_interconnect = 0
             
-            metal_merged_over_via.each do
+            metal_overlap.each do
                 shape_interconnect += 1
             end
             time_start = 0
@@ -296,7 +290,8 @@ end
                 @textInput.setPlainText("Calculate Gate " + shape_counter.to_s + " out of " +  shape_interconnect.to_s + estimated_time)
             end      
             single_via_region = RBA::Region::new(singlevia_polygon)    
-            helpl = cv.layout.insert_layer(RBA::LayerInfo::new(400,0))
+            helpl = cv.layout.layer(RBA::LayerInfo::new(400,0))
+            @topcell.layout.clear_layer(helpl)
             @topcell.shapes( helpl).insert(single_via_region)  
 
             metal_merged_over_via._destroy
