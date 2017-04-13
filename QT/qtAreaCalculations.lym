@@ -22,43 +22,43 @@ $file_path = (RBA::CellView::active.filename) #.split($mw.current_view.title)[0]
 $lv = $mw.current_view
 
 module ACM
-	def source_to_index(layer_source, aLayer)
-		active_sel_layer = $active_layout.begin_layers
-		for i in 0..aLayer.length-1      
-			if aLayer[i] == layer_source
-				break
-			end
-			active_sel_layer.next
-		end
-		active_sel_layer.current.layer_index
-	end
+    def source_to_index(layer_source, aLayer)
+        active_sel_layer = $active_layout.begin_layers
+        for i in 0..aLayer.length-1      
+            if aLayer[i] == layer_source
+                break
+            end
+            active_sel_layer.next
+        end
+        active_sel_layer.current.layer_index
+    end
 		
-	def reload(aLayerName, aLayer, aLayerIndex)
+    def reload(aLayerName, aLayer, aLayerIndex)
 	#Class LayerProperties
-		activeLayer = RBA::LayoutView::current.begin_layers
-		row = 0
+        activeLayer = RBA::LayoutView::current.begin_layers
+        row = 0
              
-		until  activeLayer.at_end? do   
-			current_name = activeLayer.current.name
+        until  activeLayer.at_end? do   
+            current_name = activeLayer.current.name
 			# # remove the source information
-			for i in 0..current_name.length      
-				if activeLayer.current.source[0] === current_name[i]
-					break
-				end
-			end
+            for i in 0..current_name.length      
+                if activeLayer.current.source[0] === current_name[i]
+                    break
+                end
+            end
 		# # remove everything after @           
-			for k in 0..activeLayer.current.source.to_s.length    
-				if activeLayer.current.source[k] === "@"
-					break
-				end
-			end  
-			aLayerName[row] = current_name[0..(i-1)]
-			aLayer[row] = activeLayer.current.source[0..(k-1)] 
-			aLayerIndex[row] = activeLayer.current.layer_index
-			activeLayer.next
-			row += 1
-		end 
-	end
+            for k in 0..activeLayer.current.source.to_s.length    
+                if activeLayer.current.source[k] === "@"
+                    break
+                end
+            end  
+            aLayerName[row] = current_name[0..(i-1)]
+            aLayer[row] = activeLayer.current.source[0..(k-1)] 
+            aLayerIndex[row] = activeLayer.current.layer_index
+            activeLayer.next
+            row += 1
+        end 
+    end
 end
 
 
@@ -163,9 +163,13 @@ module AREAMODULE
         include ACM
         def initialize(parent = nil, f = Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint )
             super  
-            # setSizeGripEnabled(false)
-            @title = ($mw.current_view.title).split("gds")[0]
+            @active_layout = $active_layout
+            @mw = $mw
             @topcell = $topcell
+            @file_path = $file_path
+            @lv = $mw.current_view
+            @title = (@mw.current_view.title).split("gds")[0]
+            
             resize(400, 100)
             setMinimumSize(300,300)
             setMaximumSize(300, 500)
@@ -234,28 +238,28 @@ module AREAMODULE
 ###############################################################
 ###############################################################          
         def calculation_settings(via_layer, metal_layer,metal_layer2, fast_cal)
-                time_start = Time.now
-                @singlevia_polygon = Array.new
-                @singlevia_coordinates = Array.new
-                values = Array.new
-                values = singlevia_calculation(via_layer, metal_layer,metal_layer2 , fast_cal,@singlevia_polygon,@singlevia_coordinates)
-                singlevia_count = @singlevia_polygon.length
-                data_path = $file_path + @title + "_" + "ViaDensity.csv"
-                report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + singlevia_count.to_s + "\n" 
-                report = report + "Multiple Via count:" + (values[0]-singlevia_count).to_s + "\n" + "Calculation Time:" + ( Time.now-time_start).to_s + " seconds" 
-                report = report + "\n data saved under " + data_path
-                @textInput.setPlainText(report)
-                @textInput.repaint
-                data_to_file(@singlevia_polygon,@singlevia_coordinates,report, data_path) 
+            time_start = Time.now
+            @singlevia_polygon = Array.new
+            @singlevia_coordinates = Array.new
+            values = Array.new
+            values = singlevia_calculation(via_layer, metal_layer,metal_layer2 , fast_cal,@singlevia_polygon,@singlevia_coordinates)
+            singlevia_count = @singlevia_polygon.length
+            data_path = @file_path + @title + "_" + "ViaDensity.csv"
+            report = "Total Via count:"+ values[0].to_s + "\n"+  "Single Via count:" + singlevia_count.to_s + "\n" 
+            report = report + "Multiple Via count:" + (values[0]-singlevia_count).to_s + "\n" + "Calculation Time:" + ( Time.now-time_start).to_s + " seconds" 
+            report = report + "\n data saved under " + data_path
+            @textInput.setPlainText(report)
+            @textInput.repaint
+            data_to_file(@singlevia_polygon,@singlevia_coordinates,report, data_path) 
         end   
 ###############################################################
 ###############################################################           
         def data_to_file(singlevia_polygon, singlevia_coordinates, report, data_path)
-            if !$file_path == nil  then raise "No File path" end
+            if !@file_path == nil  then raise "No File path" end
             File.open(data_path, "a") do |file|      
                 file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
                 singlevia_coordinates.each do |point|
-                value = point.x.to_s + ";"+  point.y.to_s
+                    value = point.x.to_s + ";"+  point.y.to_s
                     file.puts(value)
                 end
             end   
@@ -263,15 +267,15 @@ module AREAMODULE
 ###############################################################
 ###############################################################              
         def singlevia_calculation(via_layer, metal_layer,metal_layer2 , fast_cal, singlevia_polygon,singlevia_coordinates)
-            if !$lv || !$lv.active_cellview
+            if !@lv || !@lv.active_cellview
                 raise "Multiclip: No view or no layout active"
             end
-            lv = $mw.current_view
-            dbu = $mw.current_view.active_cellview.layout.dbu
+            lv = @mw.current_view
+            dbu = @mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
             #lay.flatten( @topcell.cell_index, -1,true)
             topcell  =  @topcell   
-            cv = $mw.current_view.active_cellview
+            cv = @mw.current_view.active_cellview
             # creates a tiling process which will devide the layout into tiles for calculation to save memory
             metal_overlap = RBA::Region::new()       
             tp = RBA::TilingProcessor::new
@@ -373,9 +377,14 @@ module AREAMODULE
         def initialize(parent = nil)
             super
             resize(500, 500)
-            @title = ($mw.current_view.title).split("gds")[0]
+            
+            @active_layout = $active_layout
+            @mw = $mw
             @topcell = $topcell
-
+            @file_path = $file_path
+            @lv = $mw.current_view
+            
+            @title = ($mw.current_view.title).split("gds")[0]
             @aLayerName = Array.new
             @aLayer = Array.new
             @aLayerIndex = Array.new
@@ -479,7 +488,7 @@ module AREAMODULE
 	    b4.clicked do
 	        output = Array.new
 	        @tree_density_layer.selectAll
-                File.open($file_path + @title +  "_Area.csv", "a") do |file|
+                File.open(@file_path + @title +  "_Area.csv", "a") do |file|
                     file.puts("Area in % ; Area in mu^2 ; Layer ; " + (Time.now).to_s)
                     @tree_density_layer.selectedItems.each do |item|
                         file.puts(area_calculation(item.text,combo_ref.currentText))
@@ -499,9 +508,9 @@ module AREAMODULE
 ###############################################################
 ###############################################################     
         def chip_area(sel_layer,dbu)
-            cv = $mw.current_view.active_cellview
+            cv = @mw.current_view.active_cellview
             a = 0
-            region = RBA::Region::new($topcell.begin_shapes_rec(source_to_index(sel_layer, @aLayer)))
+            region = RBA::Region::new(@topcell.begin_shapes_rec(source_to_index(sel_layer, @aLayer)))
             region.merge
             @xmin =  region.bbox.p1.x*dbu
             @ymin = region.bbox.p1.y*dbu
@@ -523,8 +532,8 @@ module AREAMODULE
 ###############################################################
 ###############################################################           
         def density_calculation(sel_layer, xw = 50, yw = 50)
-            chip = $topcell.bbox
-            dbu = $lv.active_cellview.layout.dbu
+            chip = @topcell.bbox
+            dbu = @lv.active_cellview.layout.dbu
             @xmin =  chip.p1.x*dbu
             @ymin = chip.p1.y*dbu
             @xmax = chip.p2.x*dbu
@@ -538,12 +547,12 @@ module AREAMODULE
 ###############################################################
 ###############################################################          
         def area_calculation(sel_layer, ref_layer)
-            dbu = $lv.active_cellview.layout.dbu
+            dbu = @lv.active_cellview.layout.dbu
             chip = chip_area(sel_layer,dbu)
             values = layer_calc(sel_layer)
             a = values[2]
             
-            active_sel_layer = $active_layout.begin_layers
+            active_sel_layer = @active_layout.begin_layers
             for i in 0..@aLayer.length-1      
                 if @aLayer[i] == sel_layer
                     break
@@ -557,7 +566,7 @@ module AREAMODULE
 ###############################################################
 ###############################################################      
         def layer_calc(sel_layer, data = []) 
-            if !$lv || !$lv.active_cellview
+            if !@lv || !@lv.active_cellview
                 raise "Multiclip: No view or no layout active"
             end
             if !sel_layer 
@@ -566,8 +575,8 @@ module AREAMODULE
             x = 0
             data_area = 0
             # obtain the pointers to the layout and cell 
-            lay = $lv.active_cellview.layout
-            top = $lv.active_cellview.cell_index
+            lay = @lv.active_cellview.layout
+            top = @lv.active_cellview.cell_index
             top_name = lay.cell_name(top)
             top_bbox = lay.cell(top).bbox
             dbu = lay.dbu
@@ -640,7 +649,7 @@ module AREAMODULE
 ###############################################################          
         def save_density_map(sel_layer, nrows, ncolumns,data = [])    
         #save the area density array into a .png image
-            active_sel_layer = $active_layout.begin_layers
+            active_sel_layer = @active_layout.begin_layers
             for i in 0..@aLayer.length-1      
                 if @aLayer[i] == sel_layer
                     break
@@ -649,7 +658,7 @@ module AREAMODULE
             end
             if nrows * ncolumns &gt; 0
                 data_string = ""
-                File.open($file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + "_DensityMap.csv", "a") do |file|
+                File.open(@file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + "_DensityMap.csv", "a") do |file|
                     qimg = QImage.new(ncolumns,nrows,RBA::QImage_Format::Format_RGB32)
                     for i in 0..nrows-1
                         for k in 0..ncolumns-1
@@ -662,7 +671,7 @@ module AREAMODULE
                         data_string.clear
                     end
                     qimg = qimg.mirrored(false,true)
-                    qimg.save($file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + ".bmp")
+                    qimg.save(@file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + ".bmp")
                 end
             end		
         end
@@ -682,6 +691,7 @@ module AREAMODULE
             @mw = $mw
             @topcell = $topcell
             @file_path = $file_path
+            @lv = $mw.current_view
         
             @title = (@mw.current_view.title).split("gds")[0]
             @aLayerName = Array.new
@@ -715,13 +725,11 @@ module AREAMODULE
             spinbox_metal_thickness = QDoubleSpinBox.new
             spinbox_metal_thickness.minimumSize = QSize.new(20, 20)
             spinbox_metal_thickness.value = 1
-            ###########
 
-            tree_source = ListWidget.new(self)
-            tree_dest = ListWidget.new(self)
             label_tree_dest = QLabel.new(self)
             label_tree_dest.text = "Via Metal Layers ascending order"
             
+            tree_source = ListWidget.new(self)            
             tree_source.minimumSize = QSize.new(50, 300)
             tree_source.setSelectionMode( QAbstractItemView::ExtendedSelection)
             tree_source.sortItems(Qt::AscendingOrder)
@@ -731,7 +739,7 @@ module AREAMODULE
                         item.destroy
                     end
             end
-           # tree_source.sortingEnabled = (true)
+            tree_dest = ListWidget.new(self)
             tree_dest.minimumSize = QSize.new(50, 300)
             tree_dest.setSelectionMode( QAbstractItemView::ExtendedSelection)
             tree_dest.sortItems(Qt::AscendingOrder)
@@ -741,11 +749,16 @@ module AREAMODULE
                         item.destroy
                     end
             end
-            #########
-                        
-            layout.addWidget(tree_source, 1, 2, 6, 1)
-            layout.addWidget(tree_dest, 1, 4, 6, 1)
-            layout.addWidget(label_tree_dest, 0, 4, 1, 1)
+            
+            @textInput = TextEdit.new(self)
+            @textInput.minimumSize = QSize.new(40, 250)
+            
+            @progress = ProgressBar.new(self)
+            @progress.setRange(0,100)
+            @progress.minimumSize = QSize.new(40, 20)
+            @progress.setVisible(true)
+            @progress.setTextVisible(false)
+            @progress.value = 0
             
             b1 = QPushButton.new(self)
             b1.text = "-&gt;"
@@ -768,45 +781,18 @@ module AREAMODULE
                 end
             end
 	    layout.addWidget(b2, 4, 3, 1, 1)
-            
-            @textInput = TextEdit.new(self)
-            @textInput.minimumSize = QSize.new(40, 250)
-            
-            @progress = ProgressBar.new(self)
-            @progress.setRange(0,100)
-            @progress.minimumSize = QSize.new(40, 20)
-            @progress.setVisible(true)
-            @progress.setTextVisible(false)
-            @progress.value = 0
 
             b3 = QPushButton.new(self)
             b3.text = "Start Calculation"
             b3.minimumSize = QSize.new(20, 50)
             b3.clicked do
-                @run = true   
-                metal_ratio = Array.new
-                via_ratio = Array.new 
-                gate_size = Array.new 
-                gate_position = Array.new
-                values = Array.new
-                tree_dest.selectAll
-                @textInput.setPlainText("Start Calculation")
-                @time_start = Time.now
-                via_dens(combo_active.currentText,combo_poly.currentText, tree_dest.selectedItems, spinbox_metal_thickness.value,  metal_ratio, via_ratio, gate_size, gate_position)
-                for i in 0..(gate_size.length-1)  
-                    for k in 0..((tree_dest.selectedItems).length/2)-1
-                        metal_ratio[k+i] = (((metal_ratio[k+i])*(spinbox_metal_thickness.value))/gate_size[i])
-                        via_ratio[k+i] = (((via_ratio[k+i]))/gate_size[i])
-                    end
-                end
-                data_path = @file_path + @title + "_" + "Antenna_Ratio.txt"
-                report = "Calculation Complete in " + (Time.now - @time_start).to_s + " seconds" 
-                report = report + "\n data saved under " + data_path
-                @textInput.setPlainText(report)   
-                data_to_file( metal_ratio, via_ratio, gate_size, gate_position,tree_dest.selectedItems, data_path)
-                
+                calculation_settings(combo_active.currentText,combo_poly.currentText, tree_dest.selectedItems, spinbox_metal_thickness.value)
             end
-
+  
+            layout.addWidget(tree_source, 1, 2, 6, 1)
+            layout.addWidget(tree_dest, 1, 4, 6, 1)
+            layout.addWidget(label_tree_dest, 0, 4, 1, 1)
+            
             combogrid.addWidget(label_combo_active, 1, 0, 1, 1)
             combogrid.addWidget(combo_active, 2, 0, 1, 1)
             combogrid.addWidget(label_combo_poly, 3, 0, 1, 1)
@@ -828,9 +814,31 @@ module AREAMODULE
             @aLayer.each do | name|
                 tree_source.addItem(name)
             end
-            
-          
-        end           
+        end  
+###############################################################
+###############################################################          
+        def calculation_settings(active_layer, poly_layer, metal_layers, metal_thickness)         
+            metal_ratio = Array.new
+            via_ratio = Array.new 
+            gate_size = Array.new 
+            gate_position = Array.new
+            values = Array.new
+            tree_dest.selectAll
+            @textInput.setPlainText("Start Calculation")
+            @time_start = Time.now
+            anntenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness,  metal_ratio, via_ratio, gate_size, gate_position)
+            for i in 0..(gate_size.length-1)  
+                for k in 0..((tree_dest.selectedItems).length/2)-1
+                    metal_ratio[k+i] = (((metal_ratio[k+i])*(spinbox_metal_thickness.value))/gate_size[i])
+                    via_ratio[k+i] = (((via_ratio[k+i]))/gate_size[i])
+                end
+            end
+            data_path = @file_path + @title + "_" + "Antenna_Ratio.txt"
+            report = "Calculation Complete in " + (Time.now - @time_start).to_s + " seconds" 
+            report = report + "\n data saved under " + data_path
+            @textInput.setPlainText(report)   
+            data_to_file( metal_ratio, via_ratio, gate_size, gate_position,tree_dest.selectedItems, data_path)        
+        end
 ###############################################################
 ###############################################################            
         def data_to_file(metal_ratio, via_ratio, gate_size, gate_position,metal_layers, data_path)
@@ -849,30 +857,19 @@ module AREAMODULE
         end
 ###############################################################
 ###############################################################              
-        def via_dens(active_layer, poly_layer, metal_layers, metal_thickness, metal_ratio, via_ratio, gate_size, gate_position)
+        def anntenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness, metal_ratio, via_ratio, gate_size, gate_position)
         
-            interface_update = 10
-            
             lv = @mw.current_view
             dbu = @mw.current_view.active_cellview.layout.dbu
             lay = lv.active_cellview.layout
-            cl = RBA::Layout.new
-            cl_cell = cl.create_cell("TOP")
-            cl.dbu = dbu
-            lay.layer_indices.each do |li|
-                cl.insert_layer_at(li, lay.get_info(li))
-            end
-            cl = lay.dup
-            cl.flatten( @topcell.cell_index, -1,true)
-            topcell  =  cl.top_cell    
+            topcell  =  @topcell 
             cv = @mw.current_view.active_cellview
 
             active = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(active_layer, @aLayer)))
             poly = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(poly_layer, @aLayer)))
             poly.merge
             poly_merged_over_active = poly.select_interacting(active)
-
-            
+            interface_update = 0
             shape_counter = 0
             counter = 0           
             
@@ -938,8 +935,7 @@ module AREAMODULE
                     interface_update += 10
                 end
             end
-            cl.destroy
-                       
+            cl.destroy 
         end
 ###############################################################
 ###############################################################                              
@@ -953,10 +949,11 @@ module AREAMODULE
         include ACM
         def initialize(parent = nil)
             super
-            @active_layout = RBA::LayoutView::current 
-            @mw = RBA::Application.instance.main_window
-            @topcell = RBA::CellView::active.layout.top_cell
-            @file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
+            @active_layout = $active_layout
+            @mw = $mw
+            @topcell = $topcell
+            @file_path = $file_path
+            @lv = $mw.current_view
     
             @title = (@mw.current_view.title).split("gds")[0]
             @aLayerName = Array.new
@@ -986,8 +983,10 @@ module AREAMODULE
 
             label_metal_overlap = QLabel.new(self)
             label_metal_overlap.text = "Metal Overlap"
+            
             label_metal_smaller = QLabel.new(self)
             label_metal_smaller.text = "&lt;="  
+            
             label_metal_greater = QLabel.new(self)
             label_metal_greater.text = "&gt;="          
             spinbox_metal_overlap = QDoubleSpinBox.new
@@ -998,7 +997,7 @@ module AREAMODULE
             spinbox_metal_overlap.value = 0.150  
             spinbox_metal_overlap.suffix=(" µm")  
             
-            spinbox_metal_overlap_min = QDoubleSpinBox.new
+            spinbox_metal_overlap_min = QDoubleSpinBox.new(self)
             spinbox_metal_overlap_min.minimumSize = QSize.new(20, 20)
             spinbox_metal_overlap_min.setDecimals(3)
             spinbox_metal_overlap_min.maximum=(1000)
@@ -1028,17 +1027,7 @@ module AREAMODULE
             b1.text = "Find Metal Overlap"
             b1.minimumSize = QSize.new(30, 50)
             b1.clicked do
-                time_start = Time.now
-                @overlap_polygon = Array.new
-                @overlap_coordinates = Array.new
-                overlap_calculation(combo_via.currentText, combo_metal.currentText, spinbox_metal_overlap.value, spinbox_metal_overlap_min.value ,@overlap_polygon,@overlap_coordinates)
-                overlap_count = @overlap_coordinates.length - 2
-                input_report = "Overlapping violations \n " + overlap_count.to_s + " EdgePairs smaller than " +  spinbox_metal_overlap.value.to_s + " µm " + " greater than " +  spinbox_metal_overlap_min.value.to_s + " µm \n"
-                input_report = input_report + "\n Via/Contact Layer: " + (combo_via.currentText).to_s + " Metal Layer: " + (combo_metal.currentText).to_s + " \n"
-                input_report = input_report +  "\n Visible in Layer500,  Add other Layer Entries \n Calculation time: " +  (Time.now - time_start).to_s 
-                @textInput.setPlainText(input_report)
-                @textInput.repaint
-                data_to_file(@overlap_polygon, @overlap_coordinates,  input_report )  
+                calculation_settings(combo_via.currentText, combo_metal.currentText, spinbox_metal_overlap.value, spinbox_metal_overlap_min.value)
             end
             layout.addWidget(b1, 9, 0, 1, 1)
             
@@ -1050,6 +1039,22 @@ module AREAMODULE
                 combo_metal.addItem(name)
             end
         end           
+###############################################################
+###############################################################          
+        def calculation_settings(via_layer, metal_layer, overlap_d, overlap_d_min)   
+            time_start = Time.now
+            @overlap_polygon = Array.new
+            @overlap_coordinates = Array.new
+            overlap_calculation(via_layer, metal_layer, overlap_d, overlap_d_min, @overlap_polygon,@overlap_coordinates)
+            overlap_count = @overlap_coordinates.length - 2
+            input_report = "Overlapping violations \n " + overlap_count.to_s + " EdgePairs smaller than " +  spinbox_metal_overlap.value.to_s + " µm " 
+            input_report = input_report + " greater than " +  spinbox_metal_overlap_min.value.to_s + " µm \n"            
+            input_report = input_report + "\n Via/Contact Layer: " + (combo_via.currentText).to_s + " Metal Layer: " + (combo_metal.currentText).to_s + " \n"
+            input_report = input_report +  "\n Visible in Layer500,  Add other Layer Entries \n Calculation time: " +  (Time.now - time_start).to_s 
+            @textInput.setPlainText(input_report)
+            @textInput.repaint
+            data_to_file(@overlap_polygon, @overlap_coordinates, input_report)          
+        end     
 ###############################################################
 ###############################################################            
         def data_to_file(overlap_polygon, overlap_coordinates, input_report)
