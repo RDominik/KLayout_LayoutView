@@ -293,23 +293,29 @@ module AREAMODULE
             tp.queue("_output(x1, a1 &amp; a2)")
             tp.execute("1")
             tp._destroy
-            # via shape iterator
-            iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer, @aLayer)))
+
             via_region = RBA::Region::new()   
+            iter_vial = (@topcell.begin_shapes_rec(source_to_index(via_layer, @aLayer)))
             via_total = 0
-            while !iter_vial.at_end?
-               if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
-                   via_region.insert(iter_vial.shape.polygon)
-               end
-                via_total += 1
-                iter_vial.next
-            end
+
             metal_overlap.merge
+
             # destroy the unnecessary objects after calculation, save memory
             if fast_cal
+                while !iter_vial.at_end?
+                    if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
+                        via_region.insert(iter_vial.shape.polygon)
+                    end
+                    via_total += 1
+                    iter_vial.next
+                end
                 metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
                 metal_overlap._destroy
            else
+            while !iter_vial.at_end?
+                via_total += 1
+                iter_vial.next
+            end
                 metal_merged_over_via = metal_overlap
             end
             via_region._destroy
@@ -325,8 +331,7 @@ module AREAMODULE
 			# iterate over every single merge metal shape
             metal_merged_over_via.each do |polygon|
             # select all overlapping via's
-                via_over_metal = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(via_layer, @aLayer), polygon.bbox))
-				
+                via_over_metal = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(via_layer, @aLayer), polygon.bbox))	
                 count_via = 0 
                 via_over_metal.each do
                     count_via += 1
