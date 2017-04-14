@@ -146,11 +146,11 @@ module AREAMODULE
             
             layout.addWidget(@tabWidget, 0, 0, 1, 2)
             #place the applications on the layout
-            single_via_grid.addWidget($single_via, 1, 0, 2, 2)
             layer_density_grid.addWidget($layer_density, 0, 0, 1, 1)
+            single_via_grid.addWidget($single_via, 1, 0, 2, 2)
             antenna_ratio_grid.addWidget($antenna_ratio, 0, 0, 2, 2)    
             overlap_grid.addWidget($overlap, 0, 0, 2, 2)    
-
+            antenna_ratio_grid.addItem(RBA::QSpacerItem::new(10,10,QSizePolicy::Minimum,QSizePolicy::Minimum))
         end
     end    
 
@@ -170,9 +170,9 @@ module AREAMODULE
             @lv = $mw.current_view
             @title = (@mw.current_view.title).split("gds")[0]
             
-            resize(400, 100)
-            setMinimumSize(300,300)
-            setMaximumSize(300, 500)
+            #resize(400, 100)
+            #setMinimumSize(300,300)
+            #setMaximumSize(300, 500)
             layout = GridLayout.new(self)           
 
             setLayout(layout)
@@ -205,7 +205,13 @@ module AREAMODULE
             @progress.setVisible(true)
             @progress.setTextVisible(false)
             @progress.value = 0
+            
+            placeholder = QLabel.new(self)
+            placeholder.minimumSize = QSize.new(400, 20)
+            placeholder.text = ""
+
             # add the widgets to the layout
+            layout.addWidget(placeholder, 0, 1, 1, 1)
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
             layout.addWidget(combo_via, 1, 0, 1, 1)
             layout.addWidget(label_combo_metal, 2, 0, 1, 1)
@@ -287,7 +293,6 @@ module AREAMODULE
             tp.queue("_output(x1, a1 &amp; a2)")
             tp.execute("1")
             tp._destroy
-            metal_overlap.merge
             # via shape iterator
             iter_vial = (topcell.begin_shapes_rec(source_to_index(via_layer, @aLayer)))
             via_region = RBA::Region::new()   
@@ -299,11 +304,15 @@ module AREAMODULE
                 via_total += 1
                 iter_vial.next
             end
+            metal_overlap.merge
             # destroy the unnecessary objects after calculation, save memory
-            metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
-            metal_overlap._destroy
+            if fast_cal
+                metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
+                metal_overlap._destroy
+           else
+                metal_merged_over_via = metal_overlap
+            end
             via_region._destroy
-
             shape_interconnect = 0
             metal_merged_over_via.each do
                 shape_interconnect += 1
@@ -371,12 +380,12 @@ module AREAMODULE
 ###############################################################  
 ###############################################################
 ###############################################################   
-    class LayerDensity &lt; QDialog
+    class LayerDensity &lt; QDialog #####################
         include RBA   
         include ACM
         def initialize(parent = nil)
             super
-            resize(500, 500)
+            #resize(500, 500)
             
             @active_layout = $active_layout
             @mw = $mw
@@ -401,9 +410,9 @@ module AREAMODULE
             @tree_source.sortItems(Qt::AscendingOrder)
             @tree_source.doubleClicked do 
                 @tree_source.selectedItems.each do |item|
-                        @tree_density_layer.addItem(item.text)
-                        item.destroy
-                    end
+                    @tree_density_layer.addItem(item.text)
+                    item.destroy
+                end
             end
             @tree_density_layer = ListWidget.new(self)
             @tree_density_layer.minimumSize = QSize.new(50, 250)
@@ -411,9 +420,9 @@ module AREAMODULE
             @tree_density_layer.sortItems(Qt::AscendingOrder)
             @tree_density_layer.doubleClicked do 
                 @tree_density_layer.selectedItems.each do |item|
-                        @tree_source.addItem(item.text)
-                        item.destroy
-                    end
+                    @tree_source.addItem(item.text)
+                    item.destroy
+                end
             end
             combo_ref = ComboBox.new(self)
             label_combo_ref = QLabel.new(self)
@@ -451,60 +460,60 @@ module AREAMODULE
                         
             b1 = QPushButton.new(self)
             b1.text = "-&gt;"
-	    b1.minimumSize = QSize.new(50, 50)
-	    b1.clicked do
-                    @tree_source.selectedItems.each do |item|
-                        @tree_density_layer.addItem(item.text)
-                        item.destroy
-                    end
+            b1.minimumSize = QSize.new(50, 50)
+            b1.clicked do
+                @tree_source.selectedItems.each do |item|
+                    @tree_density_layer.addItem(item.text)
+                    item.destroy
+                end
             end
-	    layout.addWidget(b1, 1, 1, 1, 1)
+            layout.addWidget(b1, 1, 1, 1, 1)
 	    
             b2 = QPushButton.new(self)
             b2.text = "&lt;-"
-	    b2.minimumSize = QSize.new(50, 50)
-	    b2.clicked do
+            b2.minimumSize = QSize.new(50, 50)
+            b2.clicked do
                 @tree_density_layer.selectedItems.each do |item|
                     @tree_source.addItem(item.text)
-                item.destroy 
+                    item.destroy 
                 end
             end
-	    layout.addWidget(b2, 2, 1, 1, 1)
+            layout.addWidget(b2, 2, 1, 1, 1)
 	    
-	    b3 = QPushButton.new(self)
+            b3 = QPushButton.new(self)
             b3.text = "Calculate\nLayer Density"
-	    b3.minimumSize = QSize.new(20, 50)
-	    b3.clicked do
-	        @tree_density_layer.selectAll
+            b3.minimumSize = QSize.new(20, 50)
+            b3.clicked do
+                @tree_density_layer.selectAll
                 @tree_density_layer.selectedItems.each do |item|
                     density_calculation(item.text,spinbox_resolution_x.value,spinbox_resolution_y.value)
                 end
             end
-	    combogrid.addWidget(b3, 2, 0, 1, 1)
+            combogrid.addWidget(b3, 2, 0, 1, 1)
 	    
             b4 = QPushButton.new(self)
-	    b4.text = "Calculate\nLayer Area"
-	    b4.minimumSize = QSize.new(20, 50)
-	    b4.clicked do
-	        output = Array.new
-	        @tree_density_layer.selectAll
+            b4.text = "Calculate\nLayer Area"
+            b4.minimumSize = QSize.new(20, 50)
+            b4.clicked do
+                output = Array.new
+                @tree_density_layer.selectAll
                 File.open(@file_path + @title +  "_Area.csv", "a") do |file|
                     file.puts("Area in % ; Area in mu^2 ; Layer ; " + (Time.now).to_s)
                     @tree_density_layer.selectedItems.each do |item|
                         file.puts(area_calculation(item.text,combo_ref.currentText))
                     end
                 end
-	    end
-	    combogrid.addWidget(b4, 3, 0, 1, 1)   
+            end
+            combogrid.addWidget(b4, 3, 0, 1, 1)   
 	    
-	    b5 = QPushButton.new(self)
-	    b5.text = "Refresh\nLayer List"
-	    b5.minimumSize = QSize.new(20, 50)
-	    b5.clicked do
-	        reload_trees
-	    end
-	    combogrid.addWidget(b5, 4, 0, 1, 1)
-        end
+            b5 = QPushButton.new(self)
+            b5.text = "Refresh\nLayer List"
+            b5.minimumSize = QSize.new(20, 50)
+            b5.clicked do
+                reload_trees
+            end
+            combogrid.addWidget(b5, 4, 0, 1, 1)
+        end ###############################
 ###############################################################
 ###############################################################     
         def chip_area(sel_layer,dbu)
@@ -699,12 +708,12 @@ module AREAMODULE
             @aLayerIndex = Array.new
             dbu = @mw.current_view.active_cellview.layout.dbu
                        
-            setWindowTitle("AntennaRatio" + @title)
-            setSizeGripEnabled(false)
-            resize(600, 500)
-            setMinimumSize(600,500)
-            setMaximumSize(600, 500)
-            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
+            #setWindowTitle("AntennaRatio" + @title)
+            #setSizeGripEnabled(false)
+            #resize(600, 500)
+            #setMinimumSize(600,500)
+            #setMaximumSize(600, 500)
+            #setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
             
             layout = GridLayout.new(self)
             combogrid = GridLayout.new(self)
@@ -960,12 +969,12 @@ module AREAMODULE
             @aLayer = Array.new
             @aLayerIndex = Array.new
             
-            setWindowTitle("ViaDensity " + @title)
-            setSizeGripEnabled(false)
-            resize(300, 100)
-            setMinimumSize(300,500)
-            setMaximumSize(300, 500)
-            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
+            #setWindowTitle("ViaDensity " + @title)
+            #setSizeGripEnabled(false)
+            #resize(300, 100)
+            #setMinimumSize(300,500)
+            #setMaximumSize(300, 500)
+            #setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
             
             layout = GridLayout.new(self)
             setLayout(layout)
@@ -1006,8 +1015,13 @@ module AREAMODULE
             spinbox_metal_overlap_min.suffix=(" µm")  
            
             @textInput = TextEdit.new(self)
-            @textInput.minimumSize = QSize.new(100,300)
+            @textInput.minimumSize = QSize.new(100,350)
             
+            placeholder = QLabel.new(self)
+            placeholder.minimumSize = QSize.new(400, 20)
+            placeholder.text = ""
+
+            layout.addWidget(placeholder, 0, 1, 1, 1)
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
             layout.addWidget(combo_via, 1, 0, 1, 1)
             layout.addWidget(label_combo_metal, 2, 0, 1, 1)
