@@ -14,14 +14,20 @@
  <menu-path>tools_menu.end</menu-path>
  <interpreter>ruby</interpreter>
  <dsl-interpreter-name/>
- <text>
+ <text># Version 0.1 DR 
+#
+#
+#
 $active_layout = RBA::LayoutView::current 
 $mw = RBA::Application.instance.main_window
 $topcell = RBA::CellView::active.layout.top_cell
-$file_path = (RBA::CellView::active.filename) #.split($mw.current_view.title)[0]
+$file_path = (RBA::CellView::active.filename)
 $lv = $mw.current_view
-
+# #  module for shared methods
 module ACM
+###############################################################
+# # get a string layer, returns a layer index
+###############################################################     
     def source_to_index(layer_source, aLayer)
         active_sel_layer = $active_layout.begin_layers
         for i in 0..aLayer.length-1      
@@ -32,7 +38,9 @@ module ACM
         end
         active_sel_layer.current.layer_index
     end
-		
+###############################################################
+# # Load the Layer Information into arrays
+###############################################################     		
     def reload(aLayerName, aLayer, aLayerIndex)
 	#Class LayerProperties
         activeLayer = RBA::LayoutView::current.begin_layers
@@ -59,17 +67,19 @@ module ACM
             row += 1
         end 
     end
+###############################################################
+###############################################################     
 end
-
-
+###############################################################
+############################################################### 
+#   Main Module includes the interface informations
+###############################################################
+###############################################################   
 module AREAMODULE
 
     include RBA
 
-  # This class implements a dialog with a screenshot display area and a
-  # screenshot button
-
-    # # derivative class to use virtual methods
+    # # derivative class to use the virtual  implemented methods
     class ProgressBar &lt; QProgressBar
         def initialize(parent = nil)end
         def text 
@@ -94,9 +104,7 @@ module AREAMODULE
      end
     class ListWidget &lt; QListWidget 
         def initialize(parent = nil) super end
-    end
-    
-   
+    end 
 ###############################################################
 ############################################################### 
 #   Main Class , aggregation of classes for the area calculations
@@ -135,6 +143,7 @@ module AREAMODULE
             #create the taps and insert the tap object
             @tabWidget = TabWidget.new(self)
             @tabWidget.maximumSize = QSize.new(800, 600)
+            @tabWidget.minimumSize = QSize.new(800, 600)
             #create the tap object
             single_via_tab = RBA::QDialog::new(self)
             single_via_tab.setLayout(single_via_grid)
@@ -144,18 +153,24 @@ module AREAMODULE
             antenna_ratio_tab.setLayout(antenna_ratio_grid)
             overlap_ratio_tab = RBA::QDialog::new(self)
             overlap_ratio_tab.setLayout(overlap_grid)
-            @tabWidget.insertTab(1, layer_density_tab, "Layer Area/Density")
-            @tabWidget.insertTab(2, single_via_tab, "SingleVia")
-            @tabWidget.insertTab(3, antenna_ratio_tab, "Antenna Ratio")
-            @tabWidget.insertTab(4, overlap_ratio_tab, "Overlap")
             
             layout.addWidget(@tabWidget, 0, 0, 1, 2)
             #place the applications on the layout
             layer_density_grid.addWidget($layer_density, 0, 0, 1, 1)
-            single_via_grid.addWidget($single_via, 1, 0, 2, 2)
+            single_via_grid.addWidget($single_via, 0, 0, 2, 2)
             antenna_ratio_grid.addWidget($antenna_ratio, 0, 0, 2, 2)    
             overlap_grid.addWidget($overlap, 0, 0, 2, 2)    
             #antenna_ratio_grid.addItem(RBA::QSpacerItem::new(10,10,QSizePolicy::Minimum,QSizePolicy::Minimum))
+            
+            @tabWidget.insertTab(1, layer_density_tab, "Layer Area/Density")
+            @tabWidget.insertTab(2, single_via_tab, "SingleVia")
+            @tabWidget.insertTab(3, antenna_ratio_tab, "Antenna Ratio")
+            @tabWidget.insertTab(4, overlap_ratio_tab, "Overlap")
+            @tabWidget.setCurrentIndex(3)
+            @tabWidget.setCurrentIndex(2)
+            @tabWidget.setCurrentIndex(1)
+            @tabWidget.setCurrentIndex(0)
+
         end
     end    
 
@@ -169,6 +184,8 @@ module AREAMODULE
         include ACM
         def initialize(parent = nil, f = Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint )
             super  
+            setMinimumSize(800, 550)
+            setMaximumSize(800, 550)
             @active_layout = $active_layout
             @mw = $mw
             @topcell = $topcell
@@ -183,7 +200,7 @@ module AREAMODULE
             @aLayer = Array.new
             @aLayerIndex = Array.new
             reload(@aLayerName, @aLayer, @aLayerIndex)
-			
+            #create the interace widgets		
             combo_via = ComboBox.new(self)
             combo_via.minimumSize = QSize.new(100, 20)
             label_combo_via = QLabel.new(self)
@@ -228,7 +245,7 @@ If bad allocation error occurs, restart KLayout and use slow calculation&lt;/b&g
 &lt;/body&gt;&lt;/html&gt;
             
 LABEL
-
+#/
             # add the widgets to the layout
             layout.addWidget(placeholder, 6, 1, 1, 1)
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
@@ -261,6 +278,7 @@ LABEL
             combo_metal2.addItems(@aLayer)
         end         
 ###############################################################
+# # Settings for the SingleVia calculation
 ###############################################################          
         def calculation_settings(via_layer, metal_layer,metal_layer2, fast_cal)
             time_start = Time.now
@@ -278,13 +296,15 @@ LABEL
             data_to_file(@singlevia_polygon,@singlevia_coordinates,report, data_path) 
         end   
 ###############################################################
+# # data storage into a file
 ###############################################################           
         def data_to_file(singlevia_polygon, singlevia_coordinates, report, data_path)
+            dbu = @mw.current_view.active_cellview.layout.dbu
             if !@file_path == nil  then raise "No File path" end
             File.open(data_path, "a") do |file|      
                 file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
                 singlevia_coordinates.each do |point|
-                    value = point.x.to_s + ";"+  point.y.to_s
+                    value = (point.x*dbu).to_s + ";"+  (point.y*dbu).to_s
                     file.puts(value)
                 end
             end   
@@ -302,6 +322,8 @@ LABEL
             #lay.flatten( @topcell.cell_index, -1,true)
             topcell  =  @topcell   
             cv = @mw.current_view.active_cellview
+            singlevia_coordinates.push(@topcell.bbox.p1)
+            singlevia_coordinates.push(@topcell.bbox.p2)
             # creates a tiling process which will devide the layout into tiles for calculation to save memory
             metal_overlap = RBA::Region::new()       
             tp = RBA::TilingProcessor::new
@@ -320,7 +342,6 @@ LABEL
 
             metal_overlap.merge
 
-            # destroy the unnecessary objects after calculation, save memory
             if fast_cal
                 while !iter_vial.at_end?
                     if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
@@ -332,12 +353,14 @@ LABEL
                 metal_merged_over_via = (metal_overlap.select_interacting(via_region)).dup
                 metal_overlap._destroy
             else
+            # slow calculation, only count via's
                 while !iter_vial.at_end?
                     via_total += 1
                     iter_vial.next
                 end
                 metal_merged_over_via = metal_overlap
             end
+            # destroy the unnecessary objects after calculation, save memory
             via_region._destroy
             shape_interconnect = 0
             metal_merged_over_via.each do
@@ -348,7 +371,7 @@ LABEL
             max_via_shape = 0
             shape_counter = 0 
             @progress.value = 0
-			# iterate over every single merge metal shape
+            # iterate over every single merge metal shape
             metal_merged_over_via.each do |polygon|
             # select all overlapping via's
                 via_over_metal = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(via_layer, @aLayer), polygon.bbox))	
@@ -373,6 +396,7 @@ LABEL
                 @textInput.setPlainText("Calculate Gate " + shape_counter.to_s + " out of " +  shape_interconnect.to_s + estimated_time)
             end          
             single_via_region = RBA::Region::new(singlevia_polygon)
+            # show the single via's in layer 400
             helpl = cv.layout.layer(RBA::LayerInfo::new(400,0))
             @topcell.layout.clear_layer(helpl)
             @topcell.shapes( helpl).insert(single_via_region)  
@@ -381,6 +405,7 @@ LABEL
             value = [via_total, max_via_shape]
         end
 ###############################################################
+# # calculate singlevia's on a big metal plate
 ###############################################################              
         def via_on_metal(via_layer, metal_layer, xw = 50, yw = 50)
             via_data = Array.new 
@@ -411,6 +436,8 @@ LABEL
         include ACM
         def initialize(parent = nil)
             super
+            setMinimumSize(750, 550)
+            setMaximumSize(750, 550)
             @active_layout = $active_layout
             @mw = $mw
             @topcell = $topcell
@@ -427,7 +454,7 @@ LABEL
             combogrid = GridLayout.new(self)
             spinboxgrid = GridLayout.new(self)
             setLayout(layout)
-			# # create the interface widgets
+            # create the interface widgets
             @tree_source = ListWidget.new(self)            
             @tree_source.minimumSize = QSize.new(50, 250)
             @tree_source.setSelectionMode( QAbstractItemView::ExtendedSelection)
@@ -613,13 +640,14 @@ LABEL
             output += ((active_sel_layer.current.source(true).split("@")[0])).to_s + " ; "
         end
 ###############################################################
+# # Calculate layer density and the layer area
 ###############################################################      
         def layer_calc(sel_layer, data = []) 
             if !@lv || !@lv.active_cellview
                 raise "Multiclip: No view or no layout active"
             end
             if !sel_layer 
-             raise "Multiclip: No layer selected"
+                raise "Multiclip: No layer selected"
             end
             x = 0
             data_area = 0
@@ -651,7 +679,7 @@ LABEL
                 # Prepare the clip boxes for this row.
                 # Note: because clip only works with boxes that overlap the cell's bounding box currently, we
                 # have to operate with a subset of fields to support the general case.
-                 boxes = []
+                boxes = []
                 x = @xmin
                 ncolumns = 0
                 colstart = nil
@@ -673,7 +701,7 @@ LABEL
                     cells = lay.multi_clip_into(top, cl, boxes)
                     ep = RBA::ShapeProcessor.new
                     merged = RBA::Shapes.new
-                            # Compute the area within area box
+						# Compute the area within area box
                     cells.each do |c|
                             # merge the shapes to polygons and compute the area
                         ep.merge(cl, cl.cell(c), input_layer, merged, true, 0, false, false)
@@ -695,6 +723,7 @@ LABEL
             values = [nrows,ncolumns,data_area]
         end
 ###############################################################
+# # transform the area values into a image, black and white
 ###############################################################          
         def save_density_map(sel_layer, nrows, ncolumns,data = [])    
         #save the area density array into a .png image
@@ -731,6 +760,7 @@ LABEL
     end
 ###############################################################
 ###############################################################  
+# # Calculates the Antenna effect
 ###############################################################
 ###############################################################   
     class AntennaRatio &lt; QDialog
@@ -738,6 +768,8 @@ LABEL
         include ACM
         def initialize(parent = nil)
             super
+            setMinimumSize(750, 550)
+            setMaximumSize(750, 550)
             @active_layout = $active_layout
             @mw = $mw
             @topcell = $topcell
@@ -749,18 +781,11 @@ LABEL
             @aLayer = Array.new
             @aLayerIndex = Array.new
             dbu = @mw.current_view.active_cellview.layout.dbu
-                       
-            #setWindowTitle("AntennaRatio" + @title)
-            #setSizeGripEnabled(false)
-            #resize(600, 500)
-            #setMinimumSize(600,500)
-            #setMaximumSize(600, 500)
-            #setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
             
             layout = GridLayout.new(self)
             combogrid = GridLayout.new(self)
             setLayout(layout)
-            
+            #create layout widgets
             combo_active = ComboBox.new(self)
             combo_active.minimumSize = QSize.new(20, 20)
             label_combo_active = QLabel.new(self)
@@ -787,18 +812,18 @@ LABEL
             tree_source.sortItems(Qt::AscendingOrder)
             tree_source.doubleClicked do 
                 tree_source.selectedItems.each do |item|
-                        tree_dest.addItem(item.text)
-                        item.destroy
-                    end
+                    tree_dest.addItem(item.text)
+                    item.destroy
+                end
             end
             tree_dest.minimumSize = QSize.new(50, 300)
             tree_dest.setSelectionMode( QAbstractItemView::ExtendedSelection)
             tree_dest.sortItems(Qt::AscendingOrder)
-             tree_dest.doubleClicked do 
+            tree_dest.doubleClicked do 
                 tree_dest.selectedItems.each do |item|
-                        tree_source.addItem(item.text)
-                        item.destroy
-                    end
+                    tree_source.addItem(item.text)
+                    item.destroy
+                end
             end
             
             @textInput = TextEdit.new(self)
@@ -813,33 +838,34 @@ LABEL
             
             b1 = QPushButton.new(self)
             b1.text = "-&gt;"
-	    b1.minimumSize = QSize.new(50, 50)
-	    b1.clicked do
-                    tree_source.selectedItems.each do |item|
-                        tree_dest.addItem(item.text)
-                        item.destroy
-                    end
+            b1.minimumSize = QSize.new(50, 50)
+            b1.clicked do
+                tree_source.selectedItems.each do |item|
+                    tree_dest.addItem(item.text)
+                    item.destroy
+                end
             end
-	    layout.addWidget(b1, 3, 3, 1, 1)
+            layout.addWidget(b1, 3, 3, 1, 1)
 	    
             b2 = QPushButton.new(self)
             b2.text = "&lt;-"
-	    b2.minimumSize = QSize.new(50, 50)
-	    b2.clicked do
+            b2.minimumSize = QSize.new(50, 50)
+            b2.clicked do
                 tree_dest.selectedItems.each do |item|
                     tree_source.addItem(item.text)
-                item.destroy 
+                    item.destroy 
                 end
             end
-	    layout.addWidget(b2, 4, 3, 1, 1)
+            layout.addWidget(b2, 4, 3, 1, 1)
 
             b3 = QPushButton.new(self)
             b3.text = "Start Calculation"
             b3.minimumSize = QSize.new(20, 50)
             b3.clicked do
+                tree_dest.selectAll
                 calculation_settings(combo_active.currentText,combo_poly.currentText, tree_dest.selectedItems, spinbox_metal_thickness.value)
             end
-  
+            # add the widgets to the layout
             layout.addWidget(tree_source, 1, 2, 6, 1)
             layout.addWidget(tree_dest, 1, 4, 6, 1)
             layout.addWidget(label_tree_dest, 0, 4, 1, 1)
@@ -867,6 +893,7 @@ LABEL
             end
         end  
 ###############################################################
+# # transform the area values into a image, black and white
 ###############################################################          
         def calculation_settings(active_layer, poly_layer, metal_layers, metal_thickness)         
             metal_ratio = Array.new
@@ -876,10 +903,10 @@ LABEL
             values = Array.new
             @textInput.setPlainText("Start Calculation")
             @time_start = Time.now
-            anntenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness,  metal_ratio, via_ratio, gate_size, gate_position)
+            antenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness,  metal_ratio, via_ratio, gate_size, gate_position)
             for i in 0..(gate_size.length-1)  
                 for k in 0..((metal_layers).length/2)-1
-                    metal_ratio[k+i] = (((metal_ratio[k+i])*(spinbox_metal_thickness.value))/gate_size[i])
+                    metal_ratio[k+i] = (((metal_ratio[k+i])*(metal_thickness))/gate_size[i])
                     via_ratio[k+i] = (((via_ratio[k+i]))/gate_size[i])
                 end
             end
@@ -887,9 +914,11 @@ LABEL
             report = "Calculation Complete in " + (Time.now - @time_start).to_s + " seconds" 
             report = report + "\n data saved under " + data_path
             @textInput.setPlainText(report)   
-            data_to_file( metal_ratio, via_ratio, gate_size, gate_position,metal_layers, data_path)        
+            data_to_file( metal_ratio, via_ratio, gate_size, gate_position,metal_layers, data_path)     
+            @textInput.update   
         end
 ###############################################################
+# # transform the area values into a image, black and white
 ###############################################################            
         def data_to_file(metal_ratio, via_ratio, gate_size, gate_position,metal_layers, data_path)
             metal_counter = 0
@@ -906,8 +935,9 @@ LABEL
             end
         end
 ###############################################################
+# # transform the area values into a image, black and white
 ###############################################################              
-        def anntenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness, metal_ratio, via_ratio, gate_size, gate_position)
+        def antenna_calculation(active_layer, poly_layer, metal_layers, metal_thickness, metal_ratio, via_ratio, gate_size, gate_position)
         
             lv = @mw.current_view
             dbu = @mw.current_view.active_cellview.layout.dbu
@@ -965,8 +995,6 @@ LABEL
                     metal_region.each do |pol|
                         metal_perimeter += pol.perimeter
                     end
-                    puts metal_perimeter*dbu
-                    puts via_region.area*dbu*dbu
                     metal_ratio.push(metal_perimeter*dbu)
                     
                     via_ratio.push(via_region.area*dbu*dbu)
@@ -981,16 +1009,18 @@ LABEL
                 
                @progress.value  = (counter*100)/shape_counter
                 if @progress.value == interface_update 
-                    @progress.repaint
+                    @progress.update
                     interface_update += 10
                 end
             end
+            x = 2
         end
 ###############################################################
 ###############################################################                              
     end
 ###############################################################
 ###############################################################  
+# # Calculates the via overlaping metal, in a range from min to max
 ###############################################################
 ###############################################################  
     class Overlap &lt; QDialog
@@ -998,6 +1028,8 @@ LABEL
         include ACM
         def initialize(parent = nil)
             super
+            setMinimumSize(750, 550)
+            setMaximumSize(750, 550)
             @active_layout = $active_layout
             @mw = $mw
             @topcell = $topcell
@@ -1019,7 +1051,7 @@ LABEL
             layout = GridLayout.new(self)
             setLayout(layout)
             calculate_grid = GridLayout.new(self)
-            
+            # create layout widgets
             combo_via = ComboBox.new(self)
             combo_via.minimumSize = QSize.new(100, 20)
             label_combo_via = QLabel.new(self)
@@ -1060,7 +1092,7 @@ LABEL
             placeholder = QLabel.new(self)
             placeholder.minimumSize = QSize.new(400, 20)
             placeholder.text = ""
-
+            #add the widgets to the layout
             layout.addWidget(placeholder, 0, 1, 1, 1)
             layout.addWidget(label_combo_via, 0, 0, 1, 1)
             layout.addWidget(combo_via, 1, 0, 1, 1)
@@ -1094,6 +1126,7 @@ LABEL
             end
         end           
 ###############################################################
+# #  perpare the calculation and store the results
 ###############################################################          
         def calculation_settings(via_layer, metal_layer, overlap_d, overlap_d_min)   
             time_start = Time.now
@@ -1113,18 +1146,21 @@ LABEL
             data_to_file(@overlap_polygon, @overlap_coordinates, report,data_path)          
         end     
 ###############################################################
+# # store the data in a file
 ###############################################################            
         def data_to_file(overlap_polygon, overlap_coordinates, report,data_path)
+            dbu = @mw.current_view.active_cellview.layout.dbu
             if !@file_path == nil  then raise "No File path" end
             File.open(data_path, "a") do |file|      
                 file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
                 overlap_coordinates.each do |point|
-                value = point.x.to_s + ";"+  point.y.to_s
+                value = (point.x*dbu).to_s + ";"+  (point.y*dbu).to_s
                     file.puts(value)
                 end
             end   
         end
 ###############################################################
+# # calculate the overlapping metal  over a via shape
 ###############################################################                 
         def overlap_calculation(via_layer, metal_layer, overlap_d, overlap_d_min, overlap_polygon,overlap_coordinates)
             lv = @mw.current_view
@@ -1141,7 +1177,7 @@ LABEL
             end
             
             via_region = RBA::Region::new(topcell.begin_shapes_rec(source_to_index(via_layer, @aLayer)))   
-
+            # select the via's which overlapping a metal shape
             via_overlap = RBA::Region::new()
             tp = RBA::TilingProcessor::new
             tp.threads = 4
@@ -1153,6 +1189,7 @@ LABEL
             tp.execute("1")
             tp._destroy
             
+            #create a frame for the via"s
             metal_overlap = RBA::Region::new()
             tp = RBA::TilingProcessor::new
             tp.threads = 4
@@ -1165,9 +1202,13 @@ LABEL
             tp._destroy
             via_region._destroy
             via_overlap._destroy
-            min = ((overlap_d_min/2)/dbu)
-            metal_overlap.size(-min,-min,2)
-            metal_overlap.size(min,min,2)
+            #remove a frame width &lt; min
+            if overlap_d_min != 0
+                min = ((overlap_d_min/2)/dbu)
+                min -= dbu
+                metal_overlap.size(-min,-min,2)
+                metal_overlap.size(min,min,2)
+            end
             
             overlap_violation_edges = metal_overlap.width_check(overlap_d/dbu,false, nil,80,nil,nil)
             metal_overlap._destroy
@@ -1182,10 +1223,9 @@ LABEL
             overlap_coordinates.push(@topcell.bbox.p2)
             
             overlap_violation_edges.each do |edge_pair|
-                #overlap_polygon.push(edge_pair.polygon(0))
                 overlap_coordinates.push(edge_pair.polygon(0).bbox.center)
             end      
-            
+            #create a layer with width violations
             helpl = cv.layout.layer(RBA::LayerInfo::new(500,0))
             @topcell.layout.clear_layer(helpl)
             @topcell.shapes( helpl).insert(overlap_violation_edges.polygons)  
