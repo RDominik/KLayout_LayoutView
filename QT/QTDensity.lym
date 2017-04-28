@@ -45,7 +45,6 @@ end
 
 class ListWidget &lt; QListWidget
     def initialize(parent = nil) super end
-
 end  
   
     class QTDensity &lt; QDialog
