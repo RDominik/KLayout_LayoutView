@@ -49,6 +49,7 @@ end
     
     class SingleVia &lt; QDialog
         include RBA
+       
         def initialize(parent = nil)
             super
 			@active_layout = RBA::LayoutView::current 

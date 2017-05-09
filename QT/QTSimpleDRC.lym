@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category/>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>ruby</interpreter>
+ <dsl-interpreter-name/>
+ <text>module SimpleDRCModule
+ 
+include RBA
+  
+    
+    class TabWidget &lt; QTabWidget
+        def initialize(parent = nil) end
+    end
+    
+    class ComboBox &lt; QComboBox
+        def initialize(parent = nil)end
+    end
+    
+    class GridLayout &lt; QGridLayout
+        def initialize(parent = nil)end
+        def addItem ( arg1) super end
+    end
+    class ProgressBar &lt; QProgressBar
+        def initialize(parent = nil)end
+        def text 
+            return " "
+        end
+        def sizeHint
+            return RBA::QSize.new(100, 10)
+        end
+    end
+
+    # # derivative class to use virtual methods
+class TextEdit &lt; QTextEdit
+	def initialize(parent = nil) end
+end
+	
+class ListWidget &lt; QListWidget
+    def initialize(parent = nil) super end
+end  
+
+    
+    class SimpleDRC &lt; QDialog
+        include RBA
+        def initialize(parent = nil)
+            super
+            @active_layout = RBA::LayoutView::current 
+            @mw = RBA::Application.instance.main_window
+            @topcell = RBA::CellView::active.layout.top_cell
+            @file_path = (RBA::CellView::active.filename) #.split(@mw.current_view.title)[0]
+    
+            @title = (@mw.current_view.title).split("gds")[0]
+            @aLayerName = Array.new
+            @aLayer = Array.new
+            @aLayerIndex = Array.new
+            dbu = @mw.current_view.active_cellview.layout.dbu
+                       
+            setWindowTitle("AntennaRatio" + @title)
+            setSizeGripEnabled(false)
+            resize(400, 100)
+            setMinimumSize(350,500)
+            setMaximumSize(350, 500)
+            setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint)
+            
+            layout = GridLayout.new(self)
+            combogrid = GridLayout.new(self)
+            setLayout(layout)
+            
+            combo_layer = ComboBox.new(self)
+            combo_layer.minimumSize = QSize.new(20, 20)
+            label_combo_layer = QLabel.new(self)
+            label_combo_layer.text = "Layer to check"
+            
+            combo_layer_sep1 = ComboBox.new(self)
+            combo_layer_sep1.minimumSize = QSize.new(20, 20)
+            label_combo_layer_sep1 = QLabel.new(self)
+            label_combo_layer_sep1.text = "Separation Check Layer1"
+            
+            combo_layer_sep2 = ComboBox.new(self)
+            combo_layer_sep2.minimumSize = QSize.new(20, 20)
+            label_combo_layer_sep2 = QLabel.new(self)
+            label_combo_layer_sep2.text = "Separation Check Layer2"
+            
+            label_separation_check = QLabel.new(self)
+            label_separation_check.text = "Separation in µm"
+            spinbox_separation_check = QDoubleSpinBox.new
+            spinbox_separation_check.minimumSize = QSize.new(20, 20)
+            spinbox_separation_check.setDecimals(3)
+            spinbox_separation_check.maximum=(1000)
+            spinbox_separation_check.setMinimum(0.0001)
+            spinbox_separation_check.value = 0 
+            spinbox_separation_check.suffix=(" µm") 
+            spinbox_separation_check.setSingleStep(0.01)
+            
+            label_space_check = QLabel.new(self)
+            label_space_check.text = "Space in µm"
+            spinbox_space_check = QDoubleSpinBox.new
+            spinbox_space_check.minimumSize = QSize.new(20, 20)
+            spinbox_space_check.setDecimals(3)
+            spinbox_space_check.maximum=(1000)
+            spinbox_space_check.setMinimum(0.0001)
+            spinbox_space_check.value = 0 
+            spinbox_space_check.suffix=(" µm")
+            spinbox_space_check.setSingleStep(0.01) 
+            
+            label_width_check = QLabel.new(self)
+            label_width_check.text = "width in µm"
+            spinbox_width_check = QDoubleSpinBox.new
+            spinbox_width_check.minimumSize = QSize.new(20, 20)
+            spinbox_width_check.setDecimals(3)
+            spinbox_width_check.maximum=(1000)
+            spinbox_width_check.setMinimum(0.0001)
+            spinbox_width_check.value = 0 
+            spinbox_width_check.suffix=(" µm") 
+            spinbox_width_check.setSingleStep(0.01)
+            ###########
+
+            #########
+                        
+            @textInput = TextEdit.new(self)
+            @textInput.minimumSize = QSize.new(40, 200)
+            
+            @progress = ProgressBar.new(self)
+            @progress.setRange(0,100)
+            @progress.minimumSize = QSize.new(40, 20)
+            @progress.setVisible(true)
+            @progress.setTextVisible(false)
+            @progress.value = 0
+
+            combogrid.addWidget(label_combo_layer, 1, 0, 1, 1)
+            combogrid.addWidget(combo_layer, 2, 0, 1, 1)
+            combogrid.addWidget(label_width_check, 3, 0, 1, 1)
+            combogrid.addWidget(spinbox_width_check, 4, 0, 1, 1)
+            combogrid.addWidget(label_space_check, 5, 0, 1, 1)
+            combogrid.addWidget(spinbox_space_check, 6, 0, 1, 1)
+            combogrid.addWidget(@textInput, 8, 0, 1, 2)
+            
+            combogrid.addWidget(label_combo_layer_sep1, 1, 1, 1, 1)
+            combogrid.addWidget(combo_layer_sep1, 2, 1, 1, 1)
+            combogrid.addWidget(label_combo_layer_sep2, 3, 1, 1, 1)
+            combogrid.addWidget(combo_layer_sep2, 4, 1, 1, 1)
+            combogrid.addWidget(label_separation_check, 5, 1, 1, 1)
+            combogrid.addWidget(spinbox_separation_check, 6, 1, 1, 1)
+                     
+            layout.addLayout(combogrid, 1, 0, 6, 1)
+            b3 = QPushButton.new(self)
+            b3.text = "Start Width/Space Check"
+            b3.minimumSize = QSize.new(20, 50)
+            b3.clicked do
+                space_violation = Array.new
+                width_violation = Array.new
+                calculation_settings_width_space(combo_layer.currentText, spinbox_space_check.value, spinbox_width_check.value)     
+            end
+            combogrid.addWidget(b3, 9, 0, 1, 1)
+            
+            b4 = QPushButton.new(self)
+            b4.text = "Start Separation Check"
+            b4.minimumSize = QSize.new(20, 50)
+            b4.clicked do
+                calculation_settings_separation(combo_layer_sep1.currentText,combo_layer_sep2.currentText, spinbox_separation_check.value)
+            end
+            combogrid.addWidget(b4, 9, 1, 1, 1)
+             
+            layout.addWidget(@progress, 12, 0, 1, 1)
+            reload
+            @aLayer.each do | name|
+                combo_layer.addItem(name)
+                combo_layer_sep1.addItem(name)
+                combo_layer_sep2.addItem(name)
+            end
+        end           
+###############################################################
+# #  perpare the calculation and store the results   
+############################################################### toPlainText         
+        def calculation_settings_width_space(layer, space_check_d, width_check_d)   
+            time_start = Time.now
+            space_violation = Array.new
+            width_violation = Array.new
+            space_width_check(layer, space_check_d, width_check_d, space_violation, width_violation) 
+            
+            width_violation_count = width_violation.length
+            space_violation_count = space_violation.length
+            
+            data_path_width = @file_path + @title + "_" + (layer.split("/"))[0]+ "_" + (layer.split("/"))[1] + "_"  + "WidthViolations.csv"
+            data_path_space = @file_path + @title + "_" + (layer.split("/"))[0]+ "_" + (layer.split("/"))[1]+ "_"  + "SpaceViolations.csv"
+            
+            report = "Width violations: \n " + width_violation_count.to_s + " EdgePairs smaller than " +  width_check_d.to_s + " µm "    
+            report = report + "Layer: " + layer.to_s 
+            report = report +  "\n \n Visible in Layer610,  Add other Layer Entries \n \n Calculation time: " +  (Time.now - time_start).to_s 
+            report = report +  "\n \n data saved under " + data_path_width          
+            
+            data_to_file(width_violation,  report, data_path_width)
+            
+            report2 = "Space violations: \n " + space_violation_count.to_s + " EdgePairs smaller than " +  space_check_d.to_s + " µm "    
+            report2 = report2 + "Layer: " + layer.to_s 
+            report2 = report2 +  "\n \n Visible in Layer600,  Add other Layer Entries \n \n Calculation time: " +  (Time.now - time_start).to_s 
+            report2 = report2 +  "\n \n data saved under " + data_path_space      
+            
+            data_to_file(space_violation,  report2, data_path_space) 
+            @textInput.setPlainText(report+"\n\n" + report2)
+            @textInput.repaint  
+        end     
+###############################################################
+# #  perpare the calculation and store the results   
+############################################################### toPlainText         
+        def calculation_settings_separation(layer1, layer2, separation_check_d)   
+            time_start = Time.now
+            separation_violation = Array.new
+
+            separation_check(layer1, layer2, separation_check_d, separation_violation) 
+            
+            separation_violation_count = separation_violation.length
+            
+            layer_name = (layer1.split("/"))[0]+ "_" + (layer1.split("/"))[1] + (layer2.split("/"))[0]+ "_" + (layer2.split("/"))[1]  
+            data_path_separation = @file_path + @title + "_" +  layer_name + "_"  + "SeparationViolations.csv"
+            
+            report = "Separation violations: \n " + separation_violation_count.to_s + " EdgePairs smaller than " +  separation_check_d.to_s + " µm "    
+            report = report + "Layer: " + layer1.to_s + " and " + layer2.to_s
+            report = report +  "\n \n Visible in Layer620,  Add other Layer Entries \n \n Calculation time: " +  (Time.now - time_start).to_s 
+            report = report +  "\n \n data saved under " + data_path_separation          
+            
+            data_to_file(separation_violation,  report, data_path_separation)
+
+            @textInput.setPlainText(report)
+            @textInput.repaint  
+        end     
+###############################################################
+# # store the data in a file
+###############################################################            
+        def data_to_file(violation, report,data_path)
+            dbu = @mw.current_view.active_cellview.layout.dbu
+            if !@file_path == nil  then raise "No File path" end
+            File.open(data_path, "a") do |file|      
+                file.puts( "\n \n" + Time.now.to_s + "\n \n" + report + "\n \n")
+                violation.each do |point|
+                value = (point.x*dbu).to_s + ";"+  (point.y*dbu).to_s
+                    file.puts(value)
+                end
+            end   
+        end
+###############################################################
+###############################################################         
+        def reload
+            #Class LayerProperties
+            activeLayer = @active_layout.begin_layers
+            row = 0
+         
+            until  activeLayer.at_end? do   
+           
+                current_name = activeLayer.current.name
+                # # remove the source information
+                for i in 0..current_name.length      
+                    if activeLayer.current.source[0] === current_name[i]
+                        break
+                    end
+                end
+                # # remove everything after @           
+                for k in 0..activeLayer.current.source.to_s.length    
+                    if activeLayer.current.source[k] === "@"
+                        break
+                    end
+                end  
+                @aLayerName[row] = current_name[0..(i-1)]
+                @aLayer[row] = activeLayer.current.source[0..(k-1)] 
+                @aLayerIndex[row] = activeLayer.current.layer_index
+                activeLayer.next
+                row += 1
+            end 
+        end
+###############################################################
+###############################################################          
+        def source_to_index(layer_source)
+            active_sel_layer = @active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == layer_source
+                    break
+                end
+                active_sel_layer.next
+            end
+            active_sel_layer.current.layer_index
+        end
+###############################################################
+###############################################################                 
+        def space_width_check(layer, space_d, width_d, space_violation, width_violation)
+            dbu = @mw.current_view.active_cellview.layout.dbu
+            cv = @mw.current_view.active_cellview
+            
+            layer_region = RBA::Region::new(@topcell.begin_shapes_rec(source_to_index(layer)))
+            space_violation_edges = layer_region.space_check( space_d/dbu, false,nil, 70, nil, nil)
+            width_violation_edges = layer_region.width_check( width_d/dbu, false, nil, 70, nil, nil)
+            layer_region._destroy
+            
+            space_violation_edges.each do |edge_pair|
+                space_violation.push(edge_pair.polygon(0).bbox.center)
+            end    
+            
+            width_violation_edges.each do |edge_pair|
+                width_violation.push(edge_pair.polygon(0).bbox.center)
+            end    
+            
+            space_violation_layer = cv.layout.layer(RBA::LayerInfo::new(600,0))
+            @topcell.layout.clear_layer(space_violation_layer)
+            @topcell.shapes(space_violation_layer).insert(space_violation_edges.polygons)
+            
+            width_violation_layer = cv.layout.layer(RBA::LayerInfo::new(610,0))
+            @topcell.layout.clear_layer(width_violation_layer)
+            @topcell.shapes(width_violation_layer).insert(width_violation_edges.polygons)
+                   
+        end
+###############################################################
+###############################################################            
+        def separation_check(layer1, layer2, separation_check_d, separation_violation)  
+            dbu = @mw.current_view.active_cellview.layout.dbu
+            cv = @mw.current_view.active_cellview        
+            
+            layer1_region = RBA::Region::new(@topcell.begin_shapes_rec(source_to_index(layer1)))   
+            layer2_region = RBA::Region::new(@topcell.begin_shapes_rec(source_to_index(layer2)))       
+            separation_violation_edges = layer1_region.separation_check( layer2_region, separation_check_d/dbu, false,nil, 40, nil, nil)
+            #(const Region other, unsigned int d, bool whole_edges, variant metrics, variant ignore_angle, variant min_projection, variant max_projection)
+            separation_violation_edges.each do |edge_pair|
+                separation_violation.push(edge_pair.polygon(0).bbox.center)
+            end
+            
+            width_violation_layer = cv.layout.layer(RBA::LayerInfo::new(620,0))
+            @topcell.layout.clear_layer(width_violation_layer)
+            @topcell.shapes(width_violation_layer).insert(separation_violation_edges.polygons)
+            
+            layer1_region._destroy
+            layer2_region._destroy    
+                    
+        end
+###############################################################
+###############################################################                  
+    end
+#    $dialog &amp;&amp; $dialog.destroy
+    $dialog = SimpleDRC.new(Application::instance.main_window)
+    $dialog.show
+
+end</text>
+</klayout-macro>

@@ -1,33 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<klayout-macro>
- <description>AreaCalculations</description>
- <version/>
- <category/>
- <prolog/>
- <epilog/>
- <doc/>
- <autorun>true</autorun>
- <autorun-early>false</autorun-early>
- <shortcut/>
- <show-in-menu>true</show-in-menu>
- <group-name>AreaCal</group-name>
- <menu-path>tools_menu.end</menu-path>
- <interpreter>ruby</interpreter>
- <dsl-interpreter-name/>
- <text># Version 0.1 DR 
-#
-#
-#
-$active_layout = RBA::LayoutView::current 
-$mw = RBA::Application.instance.main_window
-$topcell = RBA::CellView::active.layout.top_cell
-$file_path = (RBA::CellView::active.filename)
-$lv = $mw.current_view
 
-menu = $mw.menu
-menu.insert_separator("tools_menu.end", "techfile_script_group")
 
-menu.insert_menu("tools_menu.end", "techfile_submenu", "TechFile")
 # #  module for shared methods
 module ACM
 ###############################################################
@@ -85,7 +57,7 @@ module AREAMODULE
     include RBA
 
     # # derivative class to use the virtual  implemented methods
-    class ProgressBar &lt; QProgressBar
+    class ProgressBar < QProgressBar
         def initialize(parent = nil)end
         def text 
             return ""
@@ -94,20 +66,20 @@ module AREAMODULE
             return RBA::QSize.new(100, 10)
         end
     end
-    class TabWidget &lt; QTabWidget
+    class TabWidget < QTabWidget
         def initialize(parent = nil)end 
     end
-    class ComboBox &lt; QComboBox
+    class ComboBox < QComboBox
         def initialize(parent = nil)end 
      end
-    class TextEdit &lt; QTextEdit 
+    class TextEdit < QTextEdit 
         def initialize(parent = nil) end 
     end
-    class GridLayout &lt; QGridLayout
+    class GridLayout < QGridLayout
         def initialize(parent = nil)end
         def addItem ( arg1) super end 
      end
-    class ListWidget &lt; QListWidget 
+    class ListWidget < QListWidget 
         def initialize(parent = nil) super end
     end 
 ###############################################################
@@ -115,11 +87,18 @@ module AREAMODULE
 #   Main Class , aggregation of classes for the area calculations
 ###############################################################
 ###############################################################    
-    class AreaCal &lt; QDialog
+    class AreaCal < QDialog
         include RBA
 
         def initialize(parent = nil)
             super
+			
+			$active_layout = RBA::LayoutView::current 
+			$mw = RBA::Application.instance.main_window
+			$topcell = RBA::CellView::active.layout.top_cell
+			$file_path = (RBA::CellView::active.filename)
+			$lv = $mw.current_view
+			
             @title = ($mw.current_view.title).split("gds")[0]
     
             setWindowTitle("Area Calculations " + @title)
@@ -127,9 +106,11 @@ module AREAMODULE
             setWindowFlags(Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint);
             setSizeGripEnabled(false)
             # fixed size, min and max is same
-            setMinimumSize(800, 600)
-            setMaximumSize(800, 600)
-            
+            setMinimumSize(850, 650)
+            setMaximumSize(850, 650)
+			label_version_info = QLabel.new(self)
+            label_version_info.text = "Area Calculations V0.1"
+			
             #create calcualtion objects  
             $layer_density = LayerDensity.new(self)
             $single_via =  SingleVia.new(self)
@@ -164,6 +145,7 @@ module AREAMODULE
             simple_drc_tab.setLayout(simple_drc_grid)
             
             layout.addWidget(@tabWidget, 0, 0, 1, 2)
+			layout.addWidget(label_version_info, 1, 0, 1, 1)
             #place the applications on the layout
             layer_density_grid.addWidget($layer_density, 0, 0, 1, 1)
             single_via_grid.addWidget($single_via, 0, 0, 2, 2)
@@ -192,7 +174,7 @@ module AREAMODULE
 # # Calculates the Single Vias out of total vias  
 ###############################################################
 ###############################################################    
-    class SingleVia &lt; QWidget
+    class SingleVia < QWidget
         include RBA
         include ACM
         def initialize(parent = nil, f = Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint )
@@ -241,21 +223,21 @@ module AREAMODULE
             
             placeholder = QLabel.new(self)
             placeholder.minimumSize = QSize.new(400, 180)
-            placeholder.text= &lt;&lt;LABEL;
-&lt;html&gt;
-&lt;body&gt;
-&lt;h2&gt;necessary steps for a calculation:&lt;/h2&gt;&lt;p&gt;
-&lt;ol&gt;
-    &lt;li&gt;&lt;b&gt;choose Via Layer&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;choose Metal Layer 1&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;choose Metal Layer 2&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;press Calculate SingleVia slow or fast&lt;/b&gt;&lt;/li&gt;
-&lt;/ol&gt;
-When using fast Calculation: &lt;br&gt;
-If bad allocation error occurs, restart KLayout and use slow calculation&lt;/b&gt; &lt;br&gt;
-&lt;p&gt;
+            placeholder.text= <<LABEL;
+<html>
+<body>
+<h2>necessary steps for a calculation:</h2><p>
+<ol>
+    <li><b>choose Via Layer</b></li>
+    <li><b>choose Metal Layer 1</b></li>
+    <li><b>choose Metal Layer 2</b></li>
+    <li><b>press Calculate SingleVia slow or fast</b></li>
+</ol>
+When using fast Calculation: <br>
+If bad allocation error occurs, restart KLayout and use slow calculation</b> <br>
+<p>
 
-&lt;/body&gt;&lt;/html&gt;
+</body></html>
             
 LABEL
 #/
@@ -345,7 +327,7 @@ LABEL
             tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer2, @aLayer))))
             tp.output("x1", metal_overlap)
             tp.tile_size(50, 50)
-            tp.queue("_output(x1, a1 &amp; a2)")
+            tp.queue("_output(x1, a1 & a2)")
             tp.execute("1")
             tp._destroy
 
@@ -357,7 +339,7 @@ LABEL
 
             if fast_cal
                 while !iter_vial.at_end?
-                    if !iter_vial.shape.is_path? &amp;&amp; !iter_vial.shape.is_text? &amp;&amp; !iter_vial.shape.is_polygon?
+                    if !iter_vial.shape.is_path? && !iter_vial.shape.is_text? && !iter_vial.shape.is_polygon?
                         via_region.insert(iter_vial.shape.polygon)
                     end
                     via_total += 1
@@ -398,7 +380,7 @@ LABEL
                         singlevia_polygon.push(polygon)
                         singlevia_coordinates.push(polygon.bbox.center)
                     end     
-                elsif  count_via &gt;  max_via_shape
+                elsif  count_via >  max_via_shape
                     max_via_shape = count_via       
                 end                 
                 shape_counter += 1
@@ -444,7 +426,7 @@ LABEL
 # # Calculates the layer density and area
 ###############################################################
 ###############################################################   
-    class LayerDensity &lt; QDialog
+    class LayerDensity < QDialog
         include RBA   
         include ACM
         def initialize(parent = nil)
@@ -527,7 +509,7 @@ LABEL
             combo_ref.addItems(@aLayer)
                         
             b1 = QPushButton.new(self)
-            b1.text = "-&gt;"
+            b1.text = "->"
             b1.minimumSize = QSize.new(50, 50)
             b1.clicked do
                 @tree_source.selectedItems.each do |item|
@@ -538,7 +520,7 @@ LABEL
             layout.addWidget(b1, 1, 1, 1, 1)
 	    
             b2 = QPushButton.new(self)
-            b2.text = "&lt;-"
+            b2.text = "<-"
             b2.minimumSize = QSize.new(50, 50)
             b2.clicked do
                 @tree_density_layer.selectedItems.each do |item|
@@ -679,7 +661,7 @@ LABEL
 			# (for each row we use the multi_clip_into which is more efficient than single clips per window)
             nrows = 0
             y = @ymin
-            while y &lt; @ymax-1e-6
+            while y < @ymax-1e-6
 
 			# Prepare a new layout to receive the clips
 			# Hint: we need to clip all layers (clip does not support clipping of one layer alone currently).
@@ -696,7 +678,7 @@ LABEL
                 x = @xmin
                 ncolumns = 0
                 colstart = nil
-                while x &lt; @xmax-1e-6
+                while x < @xmax-1e-6
                     b = RBA::Box.new((0.5 + x / dbu).floor, (0.5 + y / dbu).floor, (0.5 + (x + @xw) / dbu).floor, (0.5 + (y + @yw) / dbu).floor);
                     if b.overlaps?(top_bbox)
                         colstart ||= ncolumns 
@@ -748,7 +730,7 @@ LABEL
                 active_sel_layer.next
             end
             data_path = @file_path + @title + "_" + active_sel_layer.current.source_layer.to_s + "_" + active_sel_layer.current.source_datatype.to_s + "_DensityMap.csv"
-            if nrows * ncolumns &gt; 0
+            if nrows * ncolumns > 0
                 data_string = ""
                 File.open(data_path, "a") do |file|
                     qimg = QImage.new(ncolumns,nrows,RBA::QImage_Format::Format_RGB32)
@@ -776,7 +758,7 @@ LABEL
 # # Calculates the Antenna effect
 ###############################################################
 ###############################################################   
-    class AntennaRatio &lt; QDialog
+    class AntennaRatio < QDialog
         include RBA
         include ACM
         def initialize(parent = nil)
@@ -851,7 +833,7 @@ LABEL
             @progress.value = 0
             
             b1 = QPushButton.new(self)
-            b1.text = "-&gt;"
+            b1.text = "->"
             b1.minimumSize = QSize.new(50, 50)
             b1.clicked do
                 tree_source.selectedItems.each do |item|
@@ -862,7 +844,7 @@ LABEL
             layout.addWidget(b1, 3, 3, 1, 1)
 	    
             b2 = QPushButton.new(self)
-            b2.text = "&lt;-"
+            b2.text = "<-"
             b2.minimumSize = QSize.new(50, 50)
             b2.clicked do
                 tree_dest.selectedItems.each do |item|
@@ -988,7 +970,7 @@ LABEL
                 active_over_polygon = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(active_layer, @aLayer), polygon.bbox))
             
               # Determine the total gate are on this net 
-                gate_region = RBA::Region::new(polygon) &amp; active_over_polygon
+                gate_region = RBA::Region::new(polygon) & active_over_polygon
                 gate_size.push(gate_region.area*dbu*dbu)
                 puts gate_region.area*dbu*dbu
                 gate_position.push(gate_region.bbox.center*dbu)
@@ -998,7 +980,7 @@ LABEL
                   # Select via inside the gate net by first selecting a subregion through
                   # the gate net bounding box and then doing a boolean AND
                     via_over_polygon = RBA::Region::new(topcell.begin_shapes_rec_overlapping(source_to_index(metal_layers[count].text, @aLayer), polygon.bbox))
-                    via_region = RBA::Region::new(polygon) &amp; via_over_polygon
+                    via_region = RBA::Region::new(polygon) & via_over_polygon
                 
                   # Select the metal net interacting with the vias
                     metal_over_polygon = RBA::Region::new 
@@ -1037,7 +1019,7 @@ LABEL
 # # Calculates the via overlaping metal, in a range from min to max
 ###############################################################
 ###############################################################  
-    class Overlap &lt; QDialog
+    class Overlap < QDialog
         include RBA
         include ACM
         def initialize(parent = nil)
@@ -1080,10 +1062,10 @@ LABEL
             label_metal_overlap.text = "Metal Overlap"
             
             label_metal_smaller = QLabel.new(self)
-            label_metal_smaller.text = "&lt;="  
+            label_metal_smaller.text = "<="  
             
             label_metal_greater = QLabel.new(self)
-            label_metal_greater.text = "&gt;="          
+            label_metal_greater.text = ">="          
             spinbox_metal_overlap = QDoubleSpinBox.new
             spinbox_metal_overlap.minimumSize = QSize.new(20, 20)
             spinbox_metal_overlap.setDecimals(3)
@@ -1105,21 +1087,21 @@ LABEL
             
             placeholder = QLabel.new(self)
             placeholder.minimumSize = QSize.new(400, 330)
-            placeholder.text= &lt;&lt;LABEL;
-&lt;html&gt;
-&lt;body&gt;
-&lt;h2&gt;necessary steps for a calculation:&lt;/h2&gt;&lt;p&gt;
-&lt;ol&gt;
-    &lt;li&gt;&lt;b&gt;choose Via Layer&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;choose Metal Layer&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;choose min and max overlap in µm&lt;/b&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;press Find Metal Overlap&lt;/b&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;br&gt;
-If min and max are equal, the calculation will be done for only this value&lt;/b&gt; &lt;br&gt;
-&lt;p&gt;
+            placeholder.text= <<LABEL;
+<html>
+<body>
+<h2>necessary steps for a calculation:</h2><p>
+<ol>
+    <li><b>choose Via Layer</b></li>
+    <li><b>choose Metal Layer</b></li>
+    <li><b>choose min and max overlap in µm</b></li>
+    <li><b>press Find Metal Overlap</b></li>
+</ol>
+<br>
+If min and max are equal, the calculation will be done for only this value</b> <br>
+<p>
 
-&lt;/body&gt;&lt;/html&gt;
+</body></html>
             
 LABEL
 #/
@@ -1203,7 +1185,7 @@ LABEL
             @textInput.repaint
             overlap_d += dbu
             
-            if overlap_d &lt;= overlap_d_min
+            if overlap_d <= overlap_d_min
                 raise "The lower limit need to be under " + overlap_d.to_s
             end
             
@@ -1216,7 +1198,7 @@ LABEL
             tp.input("a2",RBA::Region::new(topcell.begin_shapes_rec(source_to_index(metal_layer, @aLayer))))
             tp.output("x1", via_overlap)
             tp.tile_size(50, 50)
-            tp.queue("_output(x1, a1 &amp; a2)")
+            tp.queue("_output(x1, a1 & a2)")
             tp.execute("1")
             tp._destroy
             
@@ -1233,7 +1215,7 @@ LABEL
             tp._destroy
             via_region._destroy
             via_overlap._destroy
-            #remove a frame width &lt; min
+            #remove a frame width < min
             if overlap_d_min != 0
                 min = ((overlap_d_min/2)/dbu)
                 min -= dbu
@@ -1269,7 +1251,7 @@ LABEL
 ###############################################################  
 ###############################################################
 ###############################################################  
-    class SimpleDRC &lt; QDialog
+    class SimpleDRC < QDialog
         include RBA
         include ACM
         def initialize(parent = nil)
@@ -1530,10 +1512,41 @@ LABEL
   # Passing the $main_window will make it stay on top of the main window.
 #  $dialog &amp;&amp; $dialog.destroy
     
-    $dialog = AreaCal.new(Application::instance.main_window)
-   
-    $dialog.show
+
 
 end
-</text>
-</klayout-macro>
+
+
+class AreaCalEnvironment
+    include AREAMODULE
+	def initialize
+
+		
+		app = RBA::Application.instance
+		mw = app.main_window
+
+		@action = RBA::Action.new
+		@action.title = "Chip Calculations"
+		@action.on_triggered do
+			view = RBA::Application.instance.main_window.current_view
+			if !view
+				raise "No view open for running the script on"
+			end
+			$dialog = AreaCal.new(Application::instance.main_window)
+			$dialog.show
+			# $dialog && $dialog.destroy
+		end
+
+		menu = mw.menu
+		menu.insert_separator("tools_menu.end", "techfile_script_group")
+		if !menu.is_menu?("tools_menu.techfile_submenu.end")
+			menu.insert_menu("tools_menu.end", "techfile_submenu", "TechFile")
+		end
+		
+		menu.insert_separator("tools_menu.techfile_submenu.end", "chip_cal_script_group")
+		
+		menu.insert_item("tools_menu.techfile_submenu.end", "chipcal_script_load", @action)
+	end
+end
+
+$areacal_processing_environment = AreaCalEnvironment.new
