@@ -112,11 +112,11 @@ module AREAMODULE
             label_version_info.text = "Area Calculations V0.1"
 			
             #create calcualtion objects  
-            $layer_density = LayerDensity.new(self)
-            $single_via =  SingleVia.new(self)
-            $antenna_ratio =  AntennaRatio.new(self)
-            $overlap =  Overlap.new(self)
-            $simple_drc = SimpleDRC.new(self)
+            @layer_density = LayerDensity.new(self)
+            @single_via =  SingleVia.new(self)
+            @antenna_ratio =  AntennaRatio.new(self)
+            @overlap =  Overlap.new(self)
+            @simple_drc = SimpleDRC.new(self)
             
             layout = GridLayout.new(self)
             single_via_grid = GridLayout.new(self)
@@ -147,11 +147,11 @@ module AREAMODULE
             layout.addWidget(@tabWidget, 0, 0, 1, 2)
 			layout.addWidget(label_version_info, 1, 0, 1, 1)
             #place the applications on the layout
-            layer_density_grid.addWidget($layer_density, 0, 0, 1, 1)
-            single_via_grid.addWidget($single_via, 0, 0, 2, 2)
-            antenna_ratio_grid.addWidget($antenna_ratio, 0, 0, 2, 2)    
-            overlap_grid.addWidget($overlap, 0, 0, 2, 2) 
-            simple_drc_grid.addWidget($simple_drc, 0, 0, 2, 2)       
+            layer_density_grid.addWidget(@layer_density, 0, 0, 1, 1)
+            single_via_grid.addWidget(@single_via, 0, 0, 2, 2)
+            antenna_ratio_grid.addWidget(@antenna_ratio, 0, 0, 2, 2)    
+            overlap_grid.addWidget(@overlap, 0, 0, 2, 2) 
+            simple_drc_grid.addWidget(@simple_drc, 0, 0, 2, 2)       
             #antenna_ratio_grid.addItem(RBA::QSpacerItem::new(10,10,QSizePolicy::Minimum,QSizePolicy::Minimum))
             
             @tabWidget.insertTab(1, layer_density_tab, "Layer Area/Density")
@@ -174,7 +174,7 @@ module AREAMODULE
 # # Calculates the Single Vias out of total vias  
 ###############################################################
 ###############################################################    
-    class SingleVia < QWidget
+    class SingleVia < QDialog
         include RBA
         include ACM
         def initialize(parent = nil, f = Qt::Window | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint )
@@ -1532,8 +1532,8 @@ class AreaCalEnvironment
 			if !view
 				raise "No view open for running the script on"
 			end
-			$dialog = AreaCal.new(Application::instance.main_window)
-			$dialog.show
+			@dialog = AreaCal.new(Application::instance.main_window)
+			@dialog.show
 			# $dialog && $dialog.destroy
 		end
 
