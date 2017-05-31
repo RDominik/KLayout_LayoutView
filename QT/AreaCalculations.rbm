@@ -494,7 +494,7 @@ LABEL
             spinbox_lw_ratio.value = 0.2
             spinbox_lw_ratio.setDecimals(3)
             spinbox_lw_ratio.maximum=(1)
-            spinbox_lw_ratio.setMinimum(0.001)
+            spinbox_lw_ratio.setMinimum(0)
 
             spinbox_lw_ratio.setSingleStep(0.01)
             
