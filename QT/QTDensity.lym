@@ -158,6 +158,17 @@ end
                 end
             end
 	    combogrid.addWidget(b3, 2, 0, 1, 1)
+	    
+            b4 = QPushButton.new(self)
+            b4.text = "Big Metal Plate"
+	    b4.minimumSize = QSize.new(20, 50)
+	    b4.clicked do
+	        tree_density_layer.selectAll
+                tree_density_layer.selectedItems.each do |item|
+                    big_plate_calculation(item.text)
+                end
+            end
+	    combogrid.addWidget(b4, 3, 0, 1, 1)
     
         end
         
@@ -203,7 +214,114 @@ end
             @ymax = region.bbox.p2.y*dbu
             region.destroy
         end
-        
+###############################################################
+###############################################################     
+        def big_plate_calculation(sel_layer)
+            time_start = Time.now
+
+            dbu = $mw.current_view.active_cellview.layout.dbu
+            active_sel_layer = $active_layout.begin_layers
+            for i in 0..@aLayer.length-1      
+                if @aLayer[i] == sel_layer
+                    break
+                end
+                active_sel_layer.next
+            end
+            count = 0
+            metal_region = RBA::Region::new($topcell.begin_shapes_rec(active_sel_layer.current.layer_index))
+
+            metal_shape_box = Array.new
+            metal_shape_polygon = Array.new
+            
+            metal_region.each do |shape|  
+                if shape.num_points == 4
+                    metal_shape_box.push(shape)
+                else
+                    metal_shape_polygon.push(shape)
+                end
+            end
+            metal_region._destroy    
+            
+            big_single_plate = Array.new
+            big_plate_area = 0          
+            metal_shape_box.each do |shape|     
+                if shape.num_points == 4
+                     if shape.area &gt; big_plate_area
+                        big_single_plate.clear
+                        big_single_plate.push(shape.dup)
+                        big_plate_area =  shape.area
+                    elsif shape.area == big_plate_area
+                        big_single_plate.push(shape.dup)
+                     end
+                end
+            end
+            metal_shape_box.clear
+            shape_points = Array.new      
+            big_plate = Array.new      
+            metal_shape_polygon.each do |shape| 
+                 if shape.area &gt;  big_plate_area   
+                    shape_region = RBA::Region::new(shape)   
+                    shape.each_point_hull do |point|
+                        shape_points.push(point)
+                    end
+                                   
+                    shape_points.each do |point1|
+                        shape_points.each do |point2|
+                            box = Box.new(point1,point2)
+                            if  box.area &gt; big_plate_area
+                                box_region = RBA::Region::new(box)
+                                distance_ratio = (Math.sqrt(((point1.y-point2.y)*(point1.y-point2.y))*dbu*dbu))/(Math.sqrt(((point1.x-point2.x)*(point1.x-point2.x))*dbu*dbu))
+                                if distance_ratio &gt; 1
+                                    distance_ratio = 1/distance_ratio    
+                                end
+                                if distance_ratio &gt; 0.2
+                                    overlapping_region = box_region.inside(shape_region)
+                                    overlapping_region_area = overlapping_region.area
+                                    overlapping_region.destroy
+                                    
+                                    box_region_area =  box_region.area
+                                    if overlapping_region_area == box_region_area
+                                        if overlapping_region_area &gt; big_plate_area
+                                            big_plate_area = overlapping_region_area 
+                                            big_plate.clear
+                                            big_plate.push(box.dup)
+                                        elsif box_region_area == big_plate_area
+                                            big_plate.push(box.dup)
+                                        end
+                                    end                             
+                                end
+                                box_region._destroy
+                            end
+                            box._destroy
+                        end
+                    end
+                    shape_region._destroy
+                    shape_points.clear
+                end
+            end 
+            metal_shape_polygon.clear
+            
+            cv = $mw.current_view.active_cellview      
+            width_violation_layer = cv.layout.layer(RBA::LayerInfo::new(400,0))
+            $topcell.layout.clear_layer(width_violation_layer)
+            big_plate_region = RBA::Region.new()
+            for i in 0..big_plate.length-1 
+                big_plate_region.insert(big_plate[i])
+            end
+              for i in 0..big_single_plate.length-1 
+                big_plate_region.insert(big_single_plate[i])
+            end          
+            $topcell.shapes(width_violation_layer).insert(big_plate_region)
+            big_plate_region._destroy
+            puts big_plate.last
+            puts big_plate_area
+            puts count 
+            big_plate.clear
+            puts Time.now-time_start
+            Time.now-time_start
+        end
+ ###############################################################
+###############################################################         
         def density_calculation(sel_layer , ref_layer = -1, xw = 50, yw = 50)
              lv = $mw.current_view
             @xmin = 0    # left coordinate of the mapping area
